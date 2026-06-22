@@ -1,0 +1,179 @@
+/**
+ * Recorre cada fila y, cuando faltan exactamente 2 días para la
+ * fecha límite de una desviación con estatus “Pendiente” o “En Plazo”,
+ * envía un correo de alerta.  No se ejecuta en sábado ni domingo.
+ */
+function alertaDesviacionesPorArea() {
+  // 1) Salir si hoy es sábado o domingo
+  var hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);           // medianoche
+  var diaSemana = hoy.getDay();       // 0 = domingo, 6 = sábado
+  if (diaSemana === 0 || diaSemana === 6) return;
+
+  // 2) Hoja de cálculo
+  var ss   = SpreadsheetApp.getActiveSpreadsheet();
+  var hoja = ss.getSheetByName("Acumulado");
+  if (!hoja) {
+    Logger.log("❌ La hoja 'Acumulado' no existe.");
+    return;
+  }
+
+  // 3) Datos
+  var valores     = hoja.getDataRange().getValues();
+  if (valores.length < 2) return;     // solo encabezados
+
+  var encabezados = valores[0];
+  function idx(nombre) {
+    for (var k = 0; k < encabezados.length; k++) {
+      if (encabezados[k].toString().trim() === nombre) return k;
+    }
+    return -1;
+  }
+
+  var idxSubArea         = idx("ÁREA");
+  var idxCodigo          = idx("CÓDIGO");
+  var idxFechaDesv       = idx("FECHA");
+  var idxFechaLim        = idx("FECHA LÍMITE");
+  var idxcriticidad      = idx("CRITICIDAD");
+  var idxEstatusFinal    = idx("ESTATUS FINAL");
+  var idxDetalle         = idx("DETALLE");
+
+  if ([idxSubArea, idxCodigo, idxFechaDesv, idxFechaLim,idxcriticidad,idxEstatusFinal, idxDetalle]
+      .some(function(v){ return v < 0; })) {
+    Logger.log("❌ Faltan columnas obligatorias. Revisa nombres.");
+    return;
+  }
+
+  // 4) Procesar filas
+  for (var i = 1; i < valores.length; i++) {
+    var fila   = valores[i];
+    var area   = fila[idxSubArea].toString().trim().toLowerCase();
+    var estatus = fila[idxEstatusFinal].toString().trim().toLowerCase();
+    if (estatus !== "pendiente" && estatus !== "en plazo") continue;
+
+    /* --- Conversión y corrección de FECHAS ------------------------- */
+
+    // Fecha límite y fecha de desviación “crudas”
+    var rawLim = fila[idxFechaLim];
+    var rawDes = fila[idxFechaDesv];
+
+    // Convertir a Date si vienen como texto
+    var fechaLim = (rawLim instanceof Date) ? rawLim : new Date(rawLim);
+    var fechaDes = (rawDes instanceof Date) ? rawDes : new Date(rawDes);
+
+    // Corregir desfase horario (añadir 5 h) — evita el “salto” de un día
+    fechaLim.setHours(fechaLim.getHours() + 5);
+    fechaDes.setHours(fechaDes.getHours() + 5);
+
+    // Normalizar la fecha límite a medianoche
+    fechaLim.setHours(0, 0, 0, 0);
+
+    // Validar
+    if (isNaN(fechaLim.getTime())) {
+      Logger.log("⛔ Fecha límite inválida en fila " + (i + 1) + ": " + rawLim);
+      continue;
+    }
+
+    /* --- Diferencia de días --------------------------------------- */
+
+    var diffMs        = fechaLim.getTime() - hoy.getTime();
+    var diffDiasRaw   = diffMs / (1000 * 60 * 60 * 24);
+    var diffDias      = Math.round(diffDiasRaw);   // redondeo seguro
+
+    Logger.log("Fila " + (i + 1) + " → diffDias = " + diffDiasRaw);
+
+    if (diffDias !== 2) continue;   // solo alerta a 2 días
+
+    /* --- Formateo para el correo ---------------------------------- */
+
+    var formato      = "dd/MM/yyyy";
+    var tz           = Session.getScriptTimeZone();
+    var fechaLimStr  = Utilities.formatDate(fechaLim, tz, formato);
+    var fechaDesStr  = isNaN(fechaDes) ? rawDes.toString()
+                                       : Utilities.formatDate(fechaDes, tz, formato);
+
+    var codigo       = fila[idxCodigo].toString().trim();
+    var detalleDesc  = fila[idxDetalle].toString().trim();
+    var criticidad = fila[idxcriticidad].toString().trim();
+
+    /* --- Destinatarios por área ----------------------------------- */
+
+    var destinatarios = "";
+    switch (area.toLowerCase()) {
+      case "administración":
+        destinatarios = "jchavez@cssa.com.pe";
+        break;
+      case "sma":
+        destinatarios = "evasquezp@cssa.com.pe,esuxe@cssa.com.pe,mvillagarcia@cssa.com.pe";
+        break;
+      case "almacén general":
+        destinatarios = "cullauri@cssa.com.pe";
+        break;
+      case "canteras":
+        destinatarios = "malarcon@cssa.com.pe,mvargas@cssa.com.pe";
+        break;
+      case "compras":
+        destinatarios = "pbalbuena@cssa.com.pe";
+        break;
+      case "contabilidad":
+        destinatarios = "jvegaf@cssa.com.pe";
+        break;
+      case "control de calidad":
+        destinatarios = "jperezc@cssa.com.pe";
+        break;
+      case "despacho":
+        destinatarios = "yvasquez@cssa.com.pe,rrios@cssa.com.pe,jpicond@cssa.com.pe";
+        break;
+      case "gestión humana":
+        destinatarios = "cmorgan@cssa.com.pe,jfernandez@cssa.com.pe ";
+        break;
+      case "mantenimiento":
+        destinatarios = "cvallejos@cssa.com.pe,mmuro@cssa.com.pe,rlimaymanta@cssa.com.pe ";
+        break;
+      case "producción":
+        destinatarios = "ksanchez@cssa.com.pe,mlopez@cssa.com.pe,jvargasb@cssa.com.pe,aurcia@cssa.com.pe,jacosta@cssa.com.pe,jcastilloj@cssa.com.pe,jmestanza@cssa.com.pe,eterrones@cssa.com.pe ";
+        break;
+      case "relaciones comunitarias":
+        destinatarios = "rroca@cssa.com.pe,lbueno@cssa.com.pe";
+        break;
+      case "ti":
+        destinatarios = "calbites@cssa.com.pe";
+        break;
+      default:
+        destinatarios = "mvillagarcia@cssa.com.pe";
+    }
+
+    /* --- Construir y enviar correo -------------------------------- */
+
+    var asunto = "Alerta: Desviación " + codigo + " vence en 2 días";
+
+    var htmlBody =
+      "<p>Hola equipo de <strong>" + capitalizarPrimeraLetra(area) + "</strong>,</p>" +
+      "<p>Les recordamos que la desviación con código <strong>" + codigo + "</strong> " +
+      "tiene fecha límite el <strong>" + fechaLimStr + "</strong> (estatus: <em>" + estatus + "</em>).</p>" +
+      "<p>Faltan  <strong>2 días</strong> para su vencimiento.<br><br></p>" +
+      "<ul>" +
+      "<li><strong>Fecha de Desviación:</strong> " + fechaDesStr + "</li>" +
+      "<li><strong>Fecha Límite:</strong> " + fechaLimStr  + "</li>" +
+      "<li><strong>Criticidad:</strong> " + criticidad  + "</li>" +
+      "<li><strong>Detalle de la Desviación:</strong><br>" + detalleDesc + "</li>" +
+      "<p>Por favor, gestiona esta desviación antes del plazo.</p>" +
+      "<p>Saludos,<br>Mauricio Villa Garcia Nuñez,<br>Inspector SMA</p>";
+      
+    MailApp.sendEmail({
+      to:       destinatarios,
+      cc:       "evasquezp@cssa.com.pe,esuxe@cssa.com.pe",
+      subject:  asunto,
+      htmlBody: htmlBody
+    });
+
+    Logger.log("📧 Correo enviado – código: " + codigo + " | área: " + area);
+  }
+}
+
+/* -------------------------------------------------------------- */
+/* Auxiliar: Capitalizar primera letra de un texto                */
+function capitalizarPrimeraLetra(texto) {
+  if (!texto) return "";
+  return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+}
