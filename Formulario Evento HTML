@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <!-- Select2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  
+  <!-- Select2 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+  <title>Formulario</title>
+  <style>
+    :root {
+      --color-principal: #00558c;
+      --color-secundario: #f5f7fa;
+      --color-acento: #1976d2;
+    }
+    .card {
+      background-color: white;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    select.scrollable-select {
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .error-message {
+      color: red;
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body class="bg-[var(--color-secundario)] text-gray-800">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 md:p-8">
+    <h1 class="text-2xl font-bold text-center mb-6 text-white bg-[var(--color-principal)] py-4 rounded">
+      Registro de Evento - Seguridad, Salud y Medio Ambiente
+    </h1>
+
+    <!-- ✅ CORRECCIÓN Bug #1: Eliminado onsubmit="enviarFormulario(event)" y enctype="multipart/form-data" -->
+    <form id="formularioDesviaciones" class="space-y-6">
+
+      <!-- Sección 1: Información del Evento -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">1. Información del Evento</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-medium">Fecha</label>
+            <input name="fecha" type="date" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorFecha"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Unidad Principal</label>
+            <select name="unidad" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>CSSA</option>
+              <option>OTRAS</option>
+            </select>
+            <div class="error-message" id="errorUnidad"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Aspecto</label>
+            <select name="aspecto" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>AMBIENTAL</option>
+              <option>SEGURIDAD</option>
+              <option>SALUD OCUPACIONAL</option>
+            </select>
+            <div class="error-message" id="errorAspecto"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Clase de Evento</label>
+            <select name="claseEvento" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>DESVIACIÓN</option>
+              <option>DAÑO A LA PROPIEDAD</option>
+              <option>INCIDENTE</option>
+              <option>ACCIDENTE</option>
+              <option>INCIDENTE PELIGROSO</option>
+            </select>
+            <div class="error-message" id="errorClaseEvento"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Severidad</label>
+            <select name="severidadEvento" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>LEVE</option>
+              <option>GRAVE</option>
+              <option>MUY GRAVE</option>
+              <option>FATAL</option>
+            </select>
+            <div class="error-message" id="errorSeveridadEvento"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sección 2: Identificación y Lugar -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">2. Identificación y Lugar</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-medium">Empresa</label>
+            <select name="empresa" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <? for (let i = 0; i < empresas.length; i++) { ?>
+              <option value="<?= empresas[i] ?>"><?= empresas[i] ?></option>
+              <? } ?>
+            </select>
+            <div class="error-message" id="errorEmpresa"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Área / Sección de ocurrencia</label>
+            <input name="area" type="text" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorArea"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Lugar de ocurrencia</label>
+            <input name="lugar" type="text" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorLugar"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sección 3: Desglose del Evento -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">3. Desglose del Evento</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block font-medium">Tipificación</label>
+            <select name="tipificacion" class="w-full border rounded px-3 py-2 select-buscable">
+              <option value="">Seleccione</option>
+              <? for (let i = 0; i < tipificaciones.length; i++) { ?>
+              <option value="<?= tipificaciones[i] ?>"><?= tipificaciones[i] ?></option>
+              <? } ?>
+            </select>
+            <div class="error-message" id="errorTipificacion"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Desglose 1</label>
+            <textarea name="desglose1" class="w-full border rounded px-3 py-2" rows="4"></textarea>
+            <div class="error-message" id="errorDesglose1"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Detalle</label>
+            <textarea name="detalle" class="w-full border rounded px-3 py-2" rows="4"></textarea>
+            <div class="error-message" id="errorDetalle"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sección 4: Detalles Adicionales -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">4. Detalles Adicionales</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-medium">Acto / Condición</label>
+            <select name="actoCondicion" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>ACTO</option>
+              <option>CONDICIÓN</option>
+            </select>
+            <div class="error-message" id="errorActoCondicion"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Probabilidad</label>
+            <input type="text" name="probabilidad" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorProbabilidad"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Severidad</label>
+            <input type="text" name="severidadTexto" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorSeveridadTexto"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Criticidad</label>
+            <select name="criticidad" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>Moderado</option>
+              <option>Importante</option>
+              <option>No tolerable</option>
+            </select>
+            <div class="error-message" id="errorCriticidad"></div>
+          </div>
+        </div>
+        <div>
+          <label class="block font-medium">Días Perdidos</label>
+          <input name="diasPerdidos" type="number" min="0" class="w-full border rounded px-3 py-2" />
+          <div class="error-message" id="errorDiasPerdidos"></div>
+        </div>
+      </section>
+
+      <!-- Sección 5: Causas, Acciones y Responsable -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">5. Causas, Acciones y Responsable</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block font-medium">Nombre del personal relacionado al evento</label>
+            <input name="nombreRelacion1" type="text" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorNombreRelacion1"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Nombre adicional</label>
+            <input name="nombreRelacion2" type="text" class="w-full border rounded px-3 py-2" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Causas inmediatas</label>
+            <textarea name="causasInmediatas" class="w-full border rounded px-3 py-2" rows="2"></textarea>
+            <div class="error-message" id="errorCausasInmediatas"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Causas básicas</label>
+            <textarea name="causasBasicas" class="w-full border rounded px-3 py-2" rows="2"></textarea>
+            <div class="error-message" id="errorCausasBasicas"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Acción Correctiva Inmediata</label>
+            <textarea name="accionCorrectiva" class="w-full border rounded px-3 py-2" rows="3"></textarea>
+            <div class="error-message" id="errorAccionCorrectiva"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Acción Preventiva Permanente</label>
+            <textarea name="accionPreventiva" class="w-full border rounded px-3 py-2" rows="3"></textarea>
+            <div class="error-message" id="errorAccionPreventiva"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label for="responsable">Responsable:</label>
+            <select name="responsable" class="w-full border rounded px-3 py-2 scrollable-select">
+              <option value="">Seleccione</option>
+              <? for (let i = 0; i < responsables.length; i++) { ?>
+              <option value="<?= responsables[i] ?>"><?= responsables[i] ?></option>
+              <? } ?>
+            </select>
+            <div class="error-message" id="errorResponsable"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Fecha Límite</label>
+            <input name="fechaLimite" type="date" class="w-full border rounded px-3 py-2" />
+            <div class="error-message" id="errorFechaLimite"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Status</label>
+            <select name="status" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>Ejecutado</option>
+              <option>En plazo</option>
+              <option>Pendiente</option>
+            </select>
+            <div class="error-message" id="errorStatus"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sección 6: Información del Reporte -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">6. Información del Reporte</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-medium">¿Quién realizó el reporte?</label>
+            <select name="quienReporta" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>1.AUDITORÍA COMPORTAMENTAL</option>
+              <option>2.INSPECCIÓN SMA</option>
+              <option>3.INSPECCIÓN CSST</option>
+              <option>4.INSPECCIÓN SUPERVISOR SSO</option>
+              <option>5.INSPECCIÓN TRIMESTRAL GO</option>
+              <option>6.CONTRATISTA</option>
+              <option>7.INSPECCIÓN DE LAS ÁREAS</option>
+              <option>8.VÍA WHATSAPP</option>
+              <option>9. INSPECCIÓN SUPERINTENDENCIAS</option>
+            </select>
+            <div class="error-message" id="errorQuienReporta"></div>
+          </div>
+          <div>
+            <label class="block font-medium">Nombre de la persona quien realiza el reporte</label>
+            <select name="nombreReportante" class="w-full border rounded px-3 py-2 scrollable-select select-buscable">
+              <option value="">Seleccione</option>
+              <? for (let i = 0; i < nombres.length; i++) { ?>
+              <option value="<?= nombres[i] ?>"><?= nombres[i] ?></option>
+              <? } ?>
+            </select>
+            <div class="error-message" id="errorNombreReportante"></div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium">Área del reportante</label>
+            <select name="areaReportante" class="w-full border rounded px-3 py-2">
+              <option value="">Seleccione</option>
+              <option>CONTRATISTA</option>
+              <option>AUDITORIA COMPORTAMENTAL</option>
+              <option>INSPECCIÓN DE LAS ÁREAS</option>
+              <option>ADMINISTRACIÓN</option>
+              <option>ALMACÉM GENERAL</option>
+              <option>CANTERAS</option>
+              <option>COMPRAS</option>
+              <option>CONTABILIDAD</option>
+              <option>CONTROL DE CALIDAD</option>
+              <option>DESPACHO</option>
+              <option>GESTIÓN HUMANA</option>
+              <option>MANTENIMIENTO</option>
+              <option>PRODUCCIÓN</option>
+              <option>RELACIONES COMUNITARIAS</option>
+              <option>SEGURIAD CIVIL</option>
+              <option>SEGURIDAD OCUPACIONAL</option>
+              <option>TI</option>
+            </select>
+            <div class="error-message" id="errorAreaReportante"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sección 7: Evidencia Fotográfica -->
+      <section class="card">
+        <h2 class="text-xl font-semibold mb-4 text-[var(--color-acento)]">7. Evidencia Fotográfica</h2>
+        <div class="flex flex-col items-center space-y-4">
+          <label for="evidencia" class="cursor-pointer flex items-center gap-2 bg-[var(--color-principal)] text-white px-4 py-2 rounded-lg hover:bg-[var(--color-acento)] transition">
+            📷 Cargar imagen
+            <input id="evidencia" name="evidencia" type="file" accept="image/*" class="hidden" onchange="mostrarImagen(event)" />
+          </label>
+          <p class="text-sm text-gray-500">Puedes subir una imagen desde tu galería o archivos del equipo.</p>
+          <div id="previewImagen" class="hidden mt-4">
+            <p class="text-sm text-gray-700 mb-2">Vista previa:</p>
+            <img id="imagenPreview" src="" alt="Vista previa de imagen" class="max-w-xs rounded-lg shadow-md" />
+          </div>
+          <div id="mensajeConfirmacion" class="hidden mt-4 text-green-600 text-center font-semibold"></div>
+          <div id="mensajeError" class="hidden mt-4 text-red-600 text-center font-semibold"></div>
+        </div>
+      </section>
+
+      <!-- Botón de enviar -->
+      <div class="text-center mt-6">
+        <button type="submit" class="bg-[var(--color-principal)] text-white px-6 py-2 rounded hover:bg-[var(--color-acento)] transition" id="enviarFormulario">
+          Enviar
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+  <script>
+    let base64Imagen = "";
+
+    // ✅ CORRECCIÓN Bug #1: Un único addEventListener, sin onsubmit duplicado en el <form>
+    document.getElementById("formularioDesviaciones").addEventListener("submit", function(event) {
+      event.preventDefault();
+
+      const formData = new FormData(this);
+
+      const data = {
+        fecha: formData.get("fecha") || "",
+        unidad: formData.get("unidad") || "",
+        aspecto: formData.get("aspecto") || "",
+        claseEvento: formData.get("claseEvento") || "",
+        severidadEvento: formData.get("severidadEvento") || "",
+        empresa: formData.get("empresa") || "",
+        area: formData.get("area") || "",
+        lugar: formData.get("lugar") || "",
+        tipificacion: formData.get("tipificacion") || "",
+        desglose1: formData.get("desglose1") || "",
+        detalle: formData.get("detalle") || "",
+        actoCondicion: formData.get("actoCondicion") || "",
+        probabilidad: formData.get("probabilidad") || "",
+        severidadTexto: formData.get("severidadTexto") || "",
+        criticidad: formData.get("criticidad") || "",
+        diasPerdidos: formData.get("diasPerdidos") || "",
+        nombreRelacion1: formData.get("nombreRelacion1") || "",
+        nombreRelacion2: formData.get("nombreRelacion2") || "",
+        causasInmediatas: formData.get("causasInmediatas") || "",
+        causasBasicas: formData.get("causasBasicas") || "",
+        accionCorrectiva: formData.get("accionCorrectiva") || "",
+        accionPreventiva: formData.get("accionPreventiva") || "",
+        responsable: formData.get("responsable") || "",
+        fechaLimite: formData.get("fechaLimite") || "",
+        status: formData.get("status") || "",
+        quienReporta: formData.get("quienReporta") || "",
+        nombreReportante: formData.get("nombreReportante") || "",
+        areaReportante: formData.get("areaReportante") || ""
+      };
+
+      // Deshabilitar botón mientras se envía
+      document.getElementById("enviarFormulario").disabled = true;
+      document.getElementById("enviarFormulario").textContent = "Enviando...";
+
+      google.script.run
+        .withSuccessHandler(function(respuesta) {
+          alert("✅ " + respuesta);
+          document.getElementById("formularioDesviaciones").reset();
+          document.getElementById("imagenPreview").src = "";
+          document.getElementById("previewImagen").classList.add("hidden");
+          base64Imagen = "";
+          document.getElementById("enviarFormulario").disabled = false;
+          document.getElementById("enviarFormulario").textContent = "Enviar";
+        })
+        .withFailureHandler(function(e) {
+          alert("❌ Error al enviar: " + e.message);
+          document.getElementById("enviarFormulario").disabled = false;
+          document.getElementById("enviarFormulario").textContent = "Enviar";
+        })
+        .registrarFormulario(data, base64Imagen);
+    });
+
+    function mostrarImagen(event) {
+      const archivo = event.target.files[0];
+      if (!archivo) return;
+      const lector = new FileReader();
+      lector.onload = function(e) {
+        document.getElementById("imagenPreview").src = e.target.result;
+        document.getElementById("previewImagen").classList.remove("hidden");
+        base64Imagen = e.target.result;
+      };
+      lector.readAsDataURL(archivo);
+    }
+  </script>
+
+  <!-- ✅ CORRECCIÓN Bug #2: Solo Select2, eliminado bloque Choices.js que causaba error -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      $('.select-buscable').select2({
+        width: '100%'
+      });
+    });
+  </script>
+
+</body>
+</html>
