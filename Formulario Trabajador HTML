@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Portal SMA · Cementos Pacasmayo</title>
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --red:       #CE000C;
+      --red-dark:  #a50009;
+      --black:     #111111;
+      --gray-dark: #444444;
+      --gray:      #6b7280;
+      --gray-light:#e5e7eb;
+      --bg:        #f0f2f4;
+      --white:     #ffffff;
+      --ok:        #16a34a;
+      --ok-bg:     #f0fdf4;
+      --danger:    #CE000C;
+      --warn:      #f59e0b;
+      --warn-bg:   #fefce8;
+      --radius:    3px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: var(--bg);
+      color: var(--black);
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--black);
+      padding: 0 20px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .header-text h1 { font-family: 'Montserrat', sans-serif; font-size: 15px; font-weight: 700; color: white; line-height: 1.2; }
+    .header-text p { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 1px; }
+
+    /* ── TABS ── */
+    .tabs-wrap {
+      background: #1a1a1a;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      position: sticky;
+      top: 52px;
+      z-index: 190;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 8px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.45);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+
+    .tab-btn.active {
+      color: white;
+      border-bottom-color: var(--red);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: rgba(255,255,255,0.75);
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-wrap {
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-light);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .progress-bar { flex: 1; height: 3px; background: var(--gray-light); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--red); border-radius: 2px; transition: width 0.4s ease; width: 0%; }
+    .progress-label { font-family: 'Montserrat', sans-serif; font-size: 11px; color: var(--gray); font-weight: 600; white-space: nowrap; }
+
+    /* ── CONTENT ── */
+    .content { padding: 20px 16px; max-width: 540px; margin: 0 auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── SECTION CARD ── */
+    .section-card {
+      background: var(--white); border-radius: var(--radius);
+      border: 1px solid var(--gray-light); margin-bottom: 12px;
+      overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .section-header {
+      background: var(--white); padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--gray-light);
+    }
+    .section-num {
+      font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700;
+      background: var(--red); color: white; padding: 2px 8px; border-radius: 2px;
+    }
+    .section-title { font-family: 'Montserrat', sans-serif; font-size: 13px; font-weight: 700; color: var(--black); }
+    .section-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── FIELD ── */
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--gray-dark); margin-bottom: 5px; }
+    .field label .req { color: var(--red); margin-left: 2px; }
+    .field input, .field select, .field textarea {
+      width: 100%; background: var(--white); border: 1px solid #d1d5db;
+      border-radius: var(--radius); color: var(--black);
+      font-family: 'Montserrat', sans-serif; font-size: 14px;
+      padding: 9px 12px; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-appearance: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--red); box-shadow: 0 0 0 2px rgba(206,0,12,0.10);
+    }
+    .field input[type="date"] { -webkit-appearance: auto; appearance: auto; cursor: pointer; }
+    .field input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; padding: 2px; opacity: 0.5; }
+    .field input::placeholder, .field textarea::placeholder { color: #c0c0c0; }
+    .field textarea { resize: none; min-height: 90px; line-height: 1.5; }
+    .field-error { font-size: 11px; color: var(--danger); margin-top: 4px; display: none; font-weight: 500; }
+    .field.invalid input, .field.invalid select, .field.invalid textarea { border-color: var(--danger); }
+    .field.invalid .field-error { display: block; }
+
+    /* ── ARCHIVOS (multi-upload) ── */
+    .archivos-zona {
+      border: 1.5px dashed #d1d5db; border-radius: var(--radius);
+      padding: 22px 16px; text-align: center; cursor: pointer;
+      background: #fafafa; transition: all 0.15s; position: relative;
+    }
+    .archivos-zona:hover { border-color: var(--red); background: #fff5f5; }
+    .archivos-zona.drag-over { border-color: var(--red); background: #fff5f5; }
+    .archivos-zona-icon { font-size: 30px; margin-bottom: 8px; }
+    .archivos-zona-label { font-size: 13px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+    .archivos-zona-hint { font-size: 11px; color: var(--gray); }
+
+    .archivos-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+
+    .archivo-item {
+      display: flex; align-items: center; gap: 10px; background: white;
+      border: 1px solid var(--gray-light); border-radius: var(--radius); padding: 10px 12px;
+    }
+    .archivo-icono { font-size: 22px; flex-shrink: 0; }
+    .archivo-info { flex: 1; min-width: 0; }
+    .archivo-nombre { font-size: 13px; font-weight: 600; color: var(--black); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .archivo-size { font-size: 11px; color: var(--gray); margin-top: 2px; }
+    .archivo-progreso { height: 3px; background: var(--gray-light); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .archivo-progreso-fill { height: 100%; background: var(--ok); width: 0%; transition: width 0.3s; }
+    .archivo-estado { font-size: 11px; font-weight: 600; margin-top: 2px; }
+    .archivo-estado.ok { color: var(--ok); }
+    .archivo-estado.error { color: var(--red); }
+    .archivo-estado.cargando { color: var(--warn); }
+    .btn-quitar-archivo { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 16px; padding: 4px; flex-shrink: 0; }
+    .btn-quitar-archivo:hover { color: var(--red); }
+
+    /* ── INFO BOX DESVIACION ── */
+    .desv-info-box {
+      background: #fff5f5; border: 1px solid #fecaca;
+      border-left: 3px solid var(--red); border-radius: var(--radius);
+      padding: 12px 14px; display: none;
+    }
+    .desv-info-box.visible { display: block; }
+    .desv-info-label { font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .desv-info-text { font-size: 13px; color: var(--gray-dark); line-height: 1.5; }
+    .desv-info-meta { font-size: 11px; color: var(--gray); margin-top: 5px; }
+
+    /* ── FECHA AUTO DISPLAY ── */
+    .fecha-auto-display {
+      background: var(--bg); border: 1px solid var(--gray-light);
+      border-radius: var(--radius); padding: 9px 12px;
+      font-size: 13px; color: var(--gray-dark); font-weight: 600;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .fecha-auto-label { font-size: 10px; color: var(--ok); font-weight: 700; margin-top: 4px; }
+
+    /* ── BOTON SUBMIT ── */
+    .btn-submit {
+      width: 100%; background: var(--red); color: white; border: none;
+      border-radius: var(--radius); font-family: 'Montserrat', sans-serif;
+      font-size: 14px; font-weight: 700; padding: 13px 20px; cursor: pointer;
+      transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-submit:hover { background: var(--red-dark); }
+    .btn-submit:active { opacity: 0.9; }
+    .btn-submit:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--ok); color: white; padding: 14px 24px;
+      border-radius: 8px; font-family: 'Montserrat', sans-serif;
+      font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+      z-index: 999; transition: transform 0.35s cubic-bezier(.34,1.56,.64,1);
+      max-width: 90vw; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--danger); }
+
+    /* ── SUCCESS SCREENS ── */
+    .success-screen {
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 60vh; text-align: center;
+      padding: 40px 20px; gap: 16px;
+    }
+    .success-icon { font-size: 64px; animation: pop 0.5s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes pop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .success-title { font-family: 'Montserrat', sans-serif; font-size: 22px; font-weight: 700; color: var(--ok); }
+    .success-sub { font-size: 14px; color: var(--gray); max-width: 320px; line-height: 1.6; }
+    .success-badge {
+      background: var(--ok-bg); border: 1px solid #bbf7d0; border-radius: var(--radius);
+      padding: 10px 20px; font-size: 14px; color: var(--ok); font-weight: 700; letter-spacing: 1px;
+    }
+    .btn-nuevo {
+      margin-top: 8px; background: var(--red); border: none; color: white;
+      border-radius: var(--radius); font-family: 'Montserrat', sans-serif;
+      font-size: 14px; font-weight: 600; padding: 11px 24px; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-nuevo:hover { background: var(--red-dark); }
+
+    /* ── SPINNER ── */
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.7s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── BANNER DATOS GUARDADOS ── */
+    .banner-guardado {
+      display: none; background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-left: 3px solid #16a34a; border-radius: var(--radius);
+      padding: 11px 14px; margin-bottom: 14px; align-items: center;
+      justify-content: space-between; gap: 10px;
+    }
+    .banner-guardado-texto { font-size: 12px; color: #166534; line-height: 1.4; }
+    .banner-guardado-texto strong { color: #14532d; font-size: 13px; display: block; margin-bottom: 2px; }
+    .banner-guardado-borrar {
+      background: none; border: 1px solid #86efac; color: #16a34a; border-radius: var(--radius);
+      padding: 5px 10px; font-size: 11px; font-family: 'Montserrat', sans-serif;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    }
+    .banner-guardado-borrar:hover { background: #dcfce7; }
+
+    /* ── NOTA PENDIENTE ── */
+    .nota-pendiente {
+      background: var(--warn-bg); border: 1px solid #fde68a;
+      border-left: 3px solid var(--warn); border-radius: var(--radius);
+      padding: 10px 14px; font-size: 12px; color: #92400e; line-height: 1.5;
+    }
+
+    /* ── SELECT2 ── */
+    .select2-container { width: 100% !important; }
+    .select2-container--default .select2-selection--single {
+      background: var(--white); border: 1px solid #d1d5db;
+      border-radius: var(--radius); height: 38px; display: flex; align-items: center;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+      color: var(--black); font-family: 'Montserrat', sans-serif; font-size: 14px; line-height: 38px; padding-left: 12px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__placeholder { color: #c0c0c0; }
+    .select2-container--default .select2-selection--single .select2-selection__arrow { height: 38px; right: 8px; }
+    .select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b {
+      border-color: transparent transparent var(--red) transparent;
+    }
+    .select2-container--default.select2-container--focus .select2-selection--single {
+      border-color: var(--red); box-shadow: 0 0 0 2px rgba(206,0,12,0.10); outline: none;
+    }
+    .select2-dropdown {
+      background: var(--white); border: 1px solid #d1d5db;
+      border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+    }
+    .select2-search--dropdown .select2-search__field {
+      background: var(--white); border: 1px solid #d1d5db; border-radius: var(--radius);
+      color: var(--black); font-family: 'Montserrat', sans-serif; font-size: 13px; padding: 7px 10px; outline: none;
+    }
+    .select2-search--dropdown .select2-search__field:focus { border-color: var(--red); }
+    .select2-results__option { font-family: 'Montserrat', sans-serif; font-size: 13px; color: var(--black); padding: 9px 12px; }
+    .select2-container--default .select2-results__option--highlighted[aria-selected] { background: var(--red); color: white; }
+    .select2-container--default .select2-results__option[aria-selected=true] { background: #fff5f5; color: var(--red); }
+
+    /* ── CHAR COUNTER ── */
+    .char-count { font-size: 11px; color: #9ca3af; text-align: right; margin-top: 4px; }
+    .char-count.warn { color: var(--red); }
+
+    /* ════════════════════════════════════════
+       PANTALLA DE BIENVENIDA / SELECCION
+    ════════════════════════════════════════ */
+    #pantalla-bienvenida {
+      min-height: calc(100vh - 52px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+      background: var(--bg);
+    }
+
+    .bienvenida-logo {
+      margin-bottom: 32px;
+      text-align: center;
+    }
+    .bienvenida-logo-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--black);
+      padding: 10px 24px;
+      border-radius: var(--radius);
+    }
+    .bienvenida-logo-bar span {
+      font-size: 18px;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.3px;
+    }
+    .bienvenida-logo-sub {
+      font-size: 12px;
+      color: var(--gray);
+      margin-top: 8px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .bienvenida-titulo {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--black);
+      text-align: center;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .bienvenida-subtitulo {
+      font-size: 13px;
+      color: var(--gray);
+      text-align: center;
+      margin-bottom: 36px;
+      line-height: 1.6;
+      max-width: 340px;
+    }
+
+    .opciones-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    @media (max-width: 440px) {
+      .opciones-grid {
+        grid-template-columns: 1fr;
+        max-width: 320px;
+      }
+    }
+
+    .opcion-card {
+      background: var(--white);
+      border: 2px solid var(--gray-light);
+      border-radius: 8px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .opcion-card:hover {
+      border-color: var(--red);
+      box-shadow: 0 4px 16px rgba(206,0,12,0.12);
+      transform: translateY(-2px);
+    }
+
+    .opcion-card.reportar:hover {
+      background: #fff5f5;
+    }
+
+    .opcion-card.levantar:hover {
+      background: #f0fdf4;
+    }
+
+    .opcion-card.levantar {
+      border-color: #bbf7d0;
+    }
+
+    .opcion-card.levantar:hover {
+      border-color: var(--ok);
+      box-shadow: 0 4px 16px rgba(22,163,74,0.12);
+    }
+
+    .opcion-icono {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+    }
+
+    .opcion-card.reportar .opcion-icono {
+      background: #fff5f5;
+    }
+
+    .opcion-card.levantar .opcion-icono {
+      background: #f0fdf4;
+    }
+
+    .opcion-titulo {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--black);
+      line-height: 1.3;
+    }
+
+    .opcion-desc {
+      font-size: 11px;
+      color: var(--gray);
+      line-height: 1.5;
+    }
+
+    .opcion-btn {
+      margin-top: 4px;
+      padding: 8px 20px;
+      border-radius: var(--radius);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+    }
+
+    .opcion-card.reportar .opcion-btn {
+      background: var(--red);
+      color: white;
+    }
+    .opcion-card.reportar .opcion-btn:hover {
+      background: var(--red-dark);
+    }
+
+    .opcion-card.levantar .opcion-btn {
+      background: var(--ok);
+      color: white;
+    }
+    .opcion-card.levantar .opcion-btn:hover {
+      background: #15803d;
+    }
+
+    /* ocultar pestanas y progress cuando esta la bienvenida */
+    .tabs-wrap.hidden-tabs { display: none; }
+    .progress-wrap.hidden-progress { display: none; }
+
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span style="color:white;font-family:Montserrat,sans-serif;font-weight:700;font-size:16px;letter-spacing:-0.3px;">Pacasmayo</span>
+      <svg width="14" height="14" viewBox="0 0 14 14"><rect width="14" height="14" fill="#CE000C"/></svg>
+    </div>
+    <div style="width:1px;height:20px;background:rgba(255,255,255,0.2);margin:0 8px;"></div>
+    <div class="header-text">
+      <h1>Portal SMA</h1>
+      <p>Seguridad y Medio Ambiente</p>
+    </div>
+  </div>
+
+  <!-- PESTANAS (ocultas al inicio) -->
+  <div class="tabs-wrap hidden-tabs" id="tabs-wrap">
+    <button class="tab-btn active" id="tab-reporte" onclick="cambiarTab('reporte')">
+      Reportar Desviacion
+    </button>
+    <button class="tab-btn" id="tab-levantamiento" onclick="cambiarTab('levantamiento')">
+      Levantar Desviacion
+    </button>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       PANTALLA DE BIENVENIDA
+  ════════════════════════════════════════════════ -->
+  <div id="pantalla-bienvenida">
+
+    <div class="bienvenida-logo">
+      <div class="bienvenida-logo-bar">
+        <svg width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" fill="#CE000C"/></svg>
+        <span>Portal SMA</span>
+      </div>
+      <div class="bienvenida-logo-sub">Cementos Pacasmayo &middot; Seguridad y Medio Ambiente</div>
+    </div>
+
+    <div class="bienvenida-titulo">Bienvenido, &iquest;que deseas hacer?</div>
+    <div class="bienvenida-subtitulo">
+      Selecciona una opcion para continuar
+    </div>
+
+    <div class="opciones-grid">
+
+      <!-- OPCION 1: REPORTAR -->
+      <div class="opcion-card reportar" onclick="elegirOpcion('reporte')">
+        <div class="opcion-icono">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CE000C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+        </div>
+        <div class="opcion-titulo">Reportar Desviacion</div>
+        <div class="opcion-desc">
+          Observaste algo inseguro o fuera de norma. Registra el evento aqui.
+        </div>
+        <button class="opcion-btn" onclick="elegirOpcion('reporte')">Ir a reportar</button>
+      </div>
+
+      <!-- OPCION 2: LEVANTAR -->
+      <div class="opcion-card levantar" onclick="elegirOpcion('levantamiento')">
+        <div class="opcion-icono">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="opcion-titulo">Levantar Desviacion</div>
+        <div class="opcion-desc">
+          Ya corregiste una desviacion asignada. Sube tu evidencia aqui.
+        </div>
+        <button class="opcion-btn" onclick="elegirOpcion('levantamiento')">Ir a levantar</button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       TAB 1: REPORTE DE DESVIACION
+  ════════════════════════════════════════════════ -->
+  <div class="tab-content active" id="view-reporte" style="display:none;">
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label" id="progressLabel">0 / 5</div>
+    </div>
+
+    <!-- FORMULARIO REPORTE -->
+    <div class="content" id="form-section">
+      <form id="reporteForm">
+
+        <!-- BANNER DATOS GUARDADOS -->
+        <div class="banner-guardado" id="bannerGuardado">
+          <div class="banner-guardado-texto">
+            <strong>Tus datos estan guardados</strong>
+            Hemos completado tu informacion automaticamente. Revisala antes de enviar.
+          </div>
+          <button type="button" class="banner-guardado-borrar" id="btnBorrarDatos">
+            Olvidar mis datos
+          </button>
+        </div>
+
+        <!-- SECCION 1 -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num">01</span>
+            <span class="section-title">Tu Informacion</span>
+          </div>
+          <div class="section-body">
+            <div class="field" id="field-nombres">
+              <label>Nombres <span class="req">*</span></label>
+              <input type="text" name="nombres" id="nombres" placeholder="Ej: Juan Carlos" />
+              <div class="field-error">Por favor ingresa tus nombres.</div>
+            </div>
+            <div class="field" id="field-apellidos">
+              <label>Apellidos <span class="req">*</span></label>
+              <input type="text" name="apellidos" id="apellidos" placeholder="Ej: Garcia Lopez" />
+              <div class="field-error">Por favor ingresa tus apellidos.</div>
+            </div>
+            <div class="field" id="field-celular">
+              <label>Celular de contacto <span style="font-size:10px;color:var(--gray);font-weight:400;">(opcional)</span></label>
+              <input type="tel" name="celular" id="celular" placeholder="Ej: 987 654 321" />
+            </div>
+            <div class="field" id="field-correo">
+              <label>Correo electronico <span style="font-size:10px;color:var(--gray);font-weight:400;">(opcional)</span></label>
+              <input type="email" name="correo" id="correo" placeholder="Ej: juan.garcia@cssa.com.pe" />
+            </div>
+            <div class="field" id="field-empresa">
+              <label>Empresa <span class="req">*</span></label>
+              <input type="text" name="empresa" id="empresa" placeholder="Ej: CSSA, Contratista XYZ" />
+              <div class="field-error">Por favor ingresa tu empresa.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCION 2 -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num">02</span>
+            <span class="section-title">Datos de la Desviacion</span>
+          </div>
+          <div class="section-body">
+            <div class="field" id="field-lugar">
+              <label>Lugar de ocurrencia <span class="req">*</span></label>
+              <input type="text" name="lugar" id="lugar" placeholder="Ej: Planta de produccion - Zona B" />
+              <div class="field-error">Indica donde ocurrio.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCION 3 -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num">03</span>
+            <span class="section-title">Que ocurrio?</span>
+          </div>
+          <div class="section-body">
+            <div class="field" id="field-descripcion">
+              <label>Describe la desviacion <span class="req">*</span></label>
+              <textarea name="descripcion" id="descripcion"
+                placeholder="Describe que paso, como ocurrio y que condiciones observaste..."
+                maxlength="600"></textarea>
+              <div class="char-count" id="charCount">0 / 600</div>
+              <div class="field-error">La descripcion es obligatoria (minimo 10 caracteres).</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCION 4: EVIDENCIA -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num">04</span>
+            <span class="section-title">
+              Evidencia Fotografica / Video
+              <span id="rep-count-archivos" style="font-weight:400; color:var(--gray); font-size:12px; margin-left:4px;">(0 archivos)</span>
+            </span>
+          </div>
+          <div class="section-body">
+            <div class="nota-pendiente">
+              Puedes subir fotos (JPG, PNG) y videos (MP4, hasta 50 MB). Maximo 5 archivos.
+            </div>
+            <div class="archivos-zona" id="rep-archivos-zona">
+              <input type="file" id="rep-fileInput" multiple
+                accept="image/*,video/mp4,video/quicktime"
+                style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"
+                onchange="repProcesarArchivos(this.files)" />
+              <div class="archivos-zona-icon">&#128247;</div>
+              <div class="archivos-zona-label">Adjuntar fotos o videos</div>
+              <div class="archivos-zona-hint">Tomar foto, grabar video o elegir desde galeria</div>
+            </div>
+            <div class="archivos-lista" id="rep-archivos-lista"></div>
+          </div>
+        </div>
+
+        <!-- SECCION 5: PROPUESTA -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num">05</span>
+            <span class="section-title">Tienes alguna propuesta?</span>
+          </div>
+          <div class="section-body">
+            <div class="field" id="field-propuesta">
+              <label>Sugerencia para evitar que esto vuelva a ocurrir <span style="font-size:10px;color:var(--gray);font-weight:400;">(opcional)</span></label>
+              <textarea name="propuesta" id="propuesta"
+                placeholder="Ej: Colocar senalizacion en el area, revisar el procedimiento de trabajo seguro..."
+                maxlength="400" rows="4"></textarea>
+              <div class="char-count" id="charCountPropuesta">0 / 400</div>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnEnviar">
+          <span id="btnText">Enviar Reporte</span>
+          <div class="spinner" id="spinner"></div>
+        </button>
+      </form>
+    </div>
+
+    <!-- PANTALLA EXITO REPORTE -->
+    <div class="success-screen" id="success-screen">
+      <div class="success-icon">&#9989;</div>
+      <div class="success-title">Reporte Enviado!</div>
+      <div class="success-sub">Tu reporte llego al inspector SMA, quien lo revisara a la brevedad.</div>
+      <div class="success-sub" style="margin-top:12px; background:#fff5f5; border-left:3px solid #CE000C; padding:12px 14px; border-radius:3px; text-align:left; font-size:13px; line-height:1.6; color:#444;">
+        Tus datos son confidenciales.
+      </div>
+      <button class="btn-nuevo" id="btnNuevo">+ Enviar otro reporte</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       TAB 2: LEVANTAMIENTO DE DESVIACION
+  ════════════════════════════════════════════════ -->
+  <div class="tab-content" id="view-levantamiento" style="display:none;">
+
+    <div class="content" id="form-lev-section">
+      <form id="levantamientoForm">
+
+        <!-- SECCION A -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num" style="background:#16a34a;">A</span>
+            <span class="section-title">Datos del Responsable</span>
+          </div>
+          <div class="section-body">
+            <div class="field" id="lev-field-nombre">
+              <label>Nombre completo <span class="req">*</span></label>
+              <select id="lev-nombre" class="select-buscable-lev">
+                <option value="">Escribe para buscar</option>
+                <? for (let i = 0; i < nombresPersonal.length; i++) { ?>
+                <option value="<?= nombresPersonal[i] ?>"><?= nombresPersonal[i] ?></option>
+                <? } ?>
+              </select>
+              <div class="field-error">Selecciona tu nombre.</div>
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:600; color:var(--gray-dark); display:block; margin-bottom:5px;">
+                Fecha y hora del levantamiento
+              </label>
+              <div class="fecha-auto-display" id="lev-fechaHora">-</div>
+              <div class="fecha-auto-label">Se registra automaticamente al enviar</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCION B -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num" style="background:#16a34a;">B</span>
+            <span class="section-title">Desviacion a Levantar</span>
+          </div>
+          <div class="section-body">
+            <div class="nota-pendiente">
+              Solo se muestran desviaciones con estatus En Plazo o Pendiente que aun no han sido ejecutadas.
+            </div>
+            <div class="field" id="lev-field-codigo">
+              <label>Codigo de desviacion <span class="req">*</span></label>
+              <select id="lev-codigo" class="select-buscable-lev">
+                <option value="">Escribe el codigo para buscar (ej: 2026-001)</option>
+                <? for (let i = 0; i < desviacionesPendientes.length; i++) { ?>
+                <option
+                  value="<?= desviacionesPendientes[i].codigo ?>"
+                  data-detalle="<?= desviacionesPendientes[i].detalle.replace(/"/g,'&quot;') ?>"
+                  data-responsable="<?= desviacionesPendientes[i].responsable ?>"
+                  data-area="<?= desviacionesPendientes[i].area ?>"
+                  data-estatus="<?= desviacionesPendientes[i].estatus ?>"
+                  data-fechalimite="<?= desviacionesPendientes[i].fechaLimite ?>">
+                  <?= desviacionesPendientes[i].codigo ?> - <?= desviacionesPendientes[i].detalle.substring(0,55) ?>...
+                </option>
+                <? } ?>
+              </select>
+              <div class="field-error">Selecciona el codigo de la desviacion a levantar.</div>
+            </div>
+            <div class="desv-info-box" id="lev-desv-box">
+              <div class="desv-info-label">Detalle de la desviacion seleccionada</div>
+              <div class="desv-info-text" id="lev-desv-detalle">-</div>
+              <div class="desv-info-meta" id="lev-desv-meta">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCION C -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num" style="background:#16a34a;">C</span>
+            <span class="section-title">Descripcion del Levantamiento</span>
+          </div>
+          <div class="section-body">
+            <div class="field" id="lev-field-descripcion">
+              <label>Que accion se tomo para levantar esta desviacion? <span class="req">*</span></label>
+              <textarea id="lev-descripcion" rows="4"
+                placeholder="Describe las acciones correctivas ejecutadas, materiales usados, cambios realizados..."
+                maxlength="600"></textarea>
+              <div class="char-count" id="lev-charCount">0 / 600</div>
+              <div class="field-error">Describe las acciones tomadas (minimo 10 caracteres).</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCION D -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-num" style="background:#16a34a;">D</span>
+            <span class="section-title">
+              Archivos de Evidencia
+              <span id="lev-count-archivos" style="font-weight:400; color:var(--gray); font-size:12px; margin-left:4px;">(0 archivos)</span>
+            </span>
+          </div>
+          <div class="section-body">
+            <div class="nota-pendiente" style="border-left-color:#16a34a; background:#f0fdf4; border-color:#bbf7d0; color:#166534;">
+              Puedes subir fotos (JPG, PNG) y videos (MP4, hasta 50 MB). Maximo 10 archivos.
+            </div>
+            <div class="archivos-zona" id="lev-archivos-zona">
+              <input type="file" id="lev-fileInput" multiple
+                accept="image/*,video/mp4,video/quicktime"
+                style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"
+                onchange="levProcesarArchivos(this.files)" />
+              <div class="archivos-zona-icon">&#128193;</div>
+              <div class="archivos-zona-label">Seleccionar fotos o videos</div>
+              <div class="archivos-zona-hint">Tomar foto, grabar video o elegir desde galeria</div>
+            </div>
+            <div class="archivos-lista" id="lev-archivos-lista"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="lev-btnEnviar" style="background:#16a34a;">
+          <span id="lev-btnText">Enviar Levantamiento</span>
+          <div class="spinner" id="lev-spinner"></div>
+        </button>
+
+      </form>
+    </div>
+
+    <!-- PANTALLA EXITO LEVANTAMIENTO -->
+    <div class="success-screen" id="lev-success-screen" style="display:none; flex-direction:column;">
+      <div class="success-icon">&#127881;</div>
+      <div class="success-title" style="color:#16a34a;">Levantamiento Enviado!</div>
+      <div class="success-sub">
+        El inspector SMA revisara tu evidencia. Si la valida, el estatus de la desviacion cambiara a Ejecutado.
+      </div>
+      <div class="success-badge" id="lev-success-codigo">-</div>
+      <button class="btn-nuevo" id="lev-btnNuevo" style="background:#16a34a;">+ Levantar otra desviacion</button>
+    </div>
+
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ════════════════════════════════════════════════
+    // PANTALLA DE BIENVENIDA
+    // ════════════════════════════════════════════════
+    function elegirOpcion(opcion) {
+      // Ocultar bienvenida
+      document.getElementById("pantalla-bienvenida").style.display = "none";
+
+      // Mostrar pestanas
+      document.getElementById("tabs-wrap").classList.remove("hidden-tabs");
+
+      // Activar la vista correcta
+      if (opcion === "reporte") {
+        document.getElementById("tab-reporte").classList.add("active");
+        document.getElementById("tab-levantamiento").classList.remove("active");
+        document.getElementById("view-reporte").style.display = "block";
+        document.getElementById("view-levantamiento").style.display = "none";
+        document.getElementById("progress-wrap").style.display = "flex";
+      } else {
+        document.getElementById("tab-levantamiento").classList.add("active");
+        document.getElementById("tab-reporte").classList.remove("active");
+        document.getElementById("view-levantamiento").style.display = "block";
+        document.getElementById("view-reporte").style.display = "none";
+        document.getElementById("progress-wrap").style.display = "none";
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // ════════════════════════════════════════════════
+    // NAVEGACION DE PESTANAS
+    // ════════════════════════════════════════════════
+    function cambiarTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-" + tab).classList.add("active");
+
+      if (tab === "reporte") {
+        document.getElementById("view-reporte").style.display = "block";
+        document.getElementById("view-levantamiento").style.display = "none";
+        document.getElementById("progress-wrap").style.display = "flex";
+      } else {
+        document.getElementById("view-levantamiento").style.display = "block";
+        document.getElementById("view-reporte").style.display = "none";
+        document.getElementById("progress-wrap").style.display = "none";
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // ════════════════════════════════════════════════
+    // TOAST
+    // ════════════════════════════════════════════════
+    function showToast(msg, tipo = "ok") {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "toast" + (tipo === "error" ? " error" : "");
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 3500);
+    }
+
+    // ════════════════════════════════════════════════
+    // COMPRIMIR IMAGEN
+    // ════════════════════════════════════════════════
+    function comprimirImagen(file, maxPx, calidad, callback) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if (w > maxPx || h > maxPx) {
+            if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+            else { w = Math.round(w * maxPx / h); h = maxPx; }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          callback(canvas.toDataURL("image/jpeg", calidad));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ════════════════════════════════════════════════
+    // TAB 1: REPORTE — BARRA DE PROGRESO
+    // ════════════════════════════════════════════════
+    const requiredFields = ["nombres", "apellidos", "empresa", "lugar", "descripcion"];
+    function updateProgress() {
+      let filled = 0;
+      requiredFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value.trim() !== "") filled++;
+      });
+      const pct = Math.round((filled / requiredFields.length) * 100);
+      document.getElementById("progressFill").style.width = pct + "%";
+      document.getElementById("progressLabel").textContent = filled + " / " + requiredFields.length;
+    }
+    requiredFields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener("change", updateProgress); el.addEventListener("input", updateProgress); }
+    });
+    updateProgress();
+
+    // Contadores de caracteres
+    const descEl = document.getElementById("descripcion");
+    const charEl = document.getElementById("charCount");
+    descEl.addEventListener("input", () => {
+      const len = descEl.value.length;
+      charEl.textContent = len + " / 600";
+      charEl.classList.toggle("warn", len > 500);
+    });
+    const propEl = document.getElementById("propuesta");
+    const propCnt = document.getElementById("charCountPropuesta");
+    propEl.addEventListener("input", () => {
+      const len = propEl.value.length;
+      propCnt.textContent = len + " / 400";
+      propCnt.classList.toggle("warn", len > 300);
+    });
+
+    // ════════════════════════════════════════════════
+    // MULTI-ARCHIVO REPORTE
+    // ════════════════════════════════════════════════
+    let repArchivos = [];
+
+    function repDetectarTipo(file) {
+      if (file.type.startsWith("image/")) return "foto";
+      if (file.type.startsWith("video/")) return "video";
+      return "otro";
+    }
+    function repFormatTamano(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / 1024 / 1024).toFixed(1) + " MB";
+    }
+    function repProcesarArchivos(fileList) {
+      const MAX = 5;
+      Array.from(fileList).forEach(file => {
+        if (repArchivos.length >= MAX) { showToast("Maximo 5 archivos permitidos", "error"); return; }
+        if (file.size > 50 * 1024 * 1024) { showToast(file.name + " supera los 50 MB", "error"); return; }
+        const id = Date.now() + Math.random();
+        const tipo = repDetectarTipo(file);
+        repArchivos.push({ id, file, nombre: file.name, tipo, tamano: file.size, base64: "", estado: "procesando" });
+        repRenderArchivos();
+        if (tipo === "foto") {
+          comprimirImagen(file, 1280, 0.75, function(b64) {
+            const a = repArchivos.find(x => x.id === id);
+            if (a) { a.base64 = b64; a.estado = "listo"; repRenderArchivos(); }
+          });
+        } else {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            const a = repArchivos.find(x => x.id === id);
+            if (a) { a.base64 = ev.target.result; a.estado = "listo"; repRenderArchivos(); }
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      document.getElementById("rep-fileInput").value = "";
+    }
+    function repRenderArchivos() {
+      const lista = document.getElementById("rep-archivos-lista");
+      document.getElementById("rep-count-archivos").textContent =
+        `(${repArchivos.length} archivo${repArchivos.length !== 1 ? "s" : ""})`;
+      lista.innerHTML = repArchivos.map(a => `
+        <div class="archivo-item">
+          <div class="archivo-icono">${a.tipo === "video" ? "&#127909;" : "&#128247;"}</div>
+          <div class="archivo-info">
+            <div class="archivo-nombre">${a.nombre}</div>
+            <div class="archivo-size">${repFormatTamano(a.tamano)}</div>
+            <div class="archivo-progreso">
+              <div class="archivo-progreso-fill" style="width:${a.estado==='listo'?'100':a.estado==='procesando'?'40':'0'}%"></div>
+            </div>
+            <div class="archivo-estado ${a.estado==='listo'?'ok':a.estado==='error'?'error':'cargando'}">
+              ${a.estado==='listo'?'Listo':a.estado==='error'?'Error':'Procesando...'}
+            </div>
+          </div>
+          <button type="button" class="btn-quitar-archivo" onclick="repQuitarArchivo('${a.id}')">&#10005;</button>
+        </div>
+      `).join("");
+    }
+    function repQuitarArchivo(id) {
+      repArchivos = repArchivos.filter(a => String(a.id) !== String(id));
+      repRenderArchivos();
+    }
+
+    const repZona = document.getElementById("rep-archivos-zona");
+    repZona.addEventListener("dragover", e => { e.preventDefault(); repZona.classList.add("drag-over"); });
+    repZona.addEventListener("dragleave", () => repZona.classList.remove("drag-over"));
+    repZona.addEventListener("drop", e => {
+      e.preventDefault(); repZona.classList.remove("drag-over");
+      repProcesarArchivos(e.dataTransfer.files);
+    });
+
+    // ════════════════════════════════════════════════
+    // LOCALSTORAGE PERFIL
+    // ════════════════════════════════════════════════
+    const CAMPOS_PERFIL = ["nombres", "apellidos", "celular", "correo", "empresa"];
+    const LS_KEY = "cssa_trabajador_perfil";
+    function cargarPerfil() {
+      try {
+        const g = localStorage.getItem(LS_KEY);
+        if (!g) return;
+        const p = JSON.parse(g);
+        let alguno = false;
+        CAMPOS_PERFIL.forEach(id => {
+          const el = document.getElementById(id);
+          if (el && p[id]) { el.value = p[id]; alguno = true; }
+        });
+        if (alguno) { document.getElementById("bannerGuardado").style.display = "flex"; updateProgress(); }
+      } catch(e) {}
+    }
+    function guardarPerfil(data) {
+      try { const p = {}; CAMPOS_PERFIL.forEach(id => { if(data[id]) p[id]=data[id]; }); localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch(e) {}
+    }
+    function borrarPerfil() {
+      try { localStorage.removeItem(LS_KEY); } catch(e) {}
+      CAMPOS_PERFIL.forEach(id => { const el = document.getElementById(id); if(el) el.value = ""; });
+      document.getElementById("bannerGuardado").style.display = "none"; updateProgress(); showToast("Datos eliminados", "ok");
+    }
+    cargarPerfil();
+    document.getElementById("btnBorrarDatos").addEventListener("click", borrarPerfil);
+
+    // ════════════════════════════════════════════════
+    // VALIDACION Y SUBMIT REPORTE
+    // ════════════════════════════════════════════════
+    function validarReporte() {
+      const vNombres     = (document.getElementById("nombres")?.value || "").trim();
+      const vApellidos   = (document.getElementById("apellidos")?.value || "").trim();
+      const vEmpresa     = (document.getElementById("empresa")?.value || "").trim();
+      const vLugar       = (document.getElementById("lugar")?.value || "").trim();
+      const vDescripcion = (document.getElementById("descripcion")?.value || "").trim();
+      const checks = [
+        { id: "field-nombres",     invalid: !vNombres },
+        { id: "field-apellidos",   invalid: !vApellidos },
+        { id: "field-empresa",     invalid: !vEmpresa },
+        { id: "field-lugar",       invalid: !vLugar },
+        { id: "field-descripcion", invalid: !vDescripcion || vDescripcion.length < 10 },
+      ];
+      let ok = true;
+      checks.forEach(c => { const el = document.getElementById(c.id); if(el) el.classList.toggle("invalid", c.invalid); if(c.invalid) ok = false; });
+      return ok;
+    }
+
+    document.getElementById("reporteForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      if (!validarReporte()) { showToast("Completa los campos obligatorios", "error"); document.querySelector(".field.invalid")?.scrollIntoView({ behavior:"smooth", block:"center" }); return; }
+      const procesando = repArchivos.filter(a => a.estado === "procesando");
+      if (procesando.length > 0) { showToast("Espera a que los archivos terminen de procesarse", "error"); return; }
+
+      const btn = document.getElementById("btnEnviar");
+      const btnText = document.getElementById("btnText");
+      const spinner = document.getElementById("spinner");
+      btn.disabled = true; btnText.textContent = "Enviando..."; spinner.style.display = "block";
+
+      const nombres   = document.getElementById("nombres").value.trim();
+      const apellidos = document.getElementById("apellidos").value.trim();
+      const data = {
+        nombre: nombres + " " + apellidos, nombres, apellidos,
+        celular: document.getElementById("celular").value.trim(),
+        correo:  document.getElementById("correo").value.trim(),
+        empresa: document.getElementById("empresa").value.trim(),
+        areaReportante: document.getElementById("empresa").value.trim(),
+        propuesta: document.getElementById("propuesta").value.trim(),
+        fecha: new Date().toISOString().split("T")[0],
+        lugar: document.getElementById("lugar").value.trim(),
+        descripcion: document.getElementById("descripcion").value.trim(),
+      };
+      guardarPerfil(data);
+
+      const archivosPayload = repArchivos.map(a => ({
+        nombre: a.nombre, tipo: a.tipo, base64: a.base64,
+      }));
+
+      google.script.run
+        .withSuccessHandler(function() {
+          document.getElementById("form-section").style.display = "none";
+          document.getElementById("success-screen").style.display = "flex";
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        })
+        .withFailureHandler(function(err) {
+          showToast("Error al enviar: " + err.message, "error");
+          btn.disabled = false; btnText.textContent = "Enviar Reporte"; spinner.style.display = "none";
+        })
+        .registrarReporteTrabajador(data, archivosPayload);
+    });
+
+    document.getElementById("btnNuevo").addEventListener("click", () => {
+      document.getElementById("lugar").value = "";
+      document.getElementById("descripcion").value = "";
+      document.getElementById("propuesta").value = "";
+      document.querySelectorAll("#reporteForm .field.invalid").forEach(f => f.classList.remove("invalid"));
+      repArchivos = []; repRenderArchivos();
+      document.getElementById("rep-fileInput").value = "";
+      charEl.textContent = "0 / 600"; propCnt.textContent = "0 / 400";
+      const btnEnv = document.getElementById("btnEnviar");
+      btnEnv.disabled = false; document.getElementById("btnText").textContent = "Enviar Reporte"; document.getElementById("spinner").style.display = "none";
+      document.getElementById("success-screen").style.display = "none";
+      document.getElementById("form-section").style.display = "block";
+      updateProgress(); window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    // ════════════════════════════════════════════════
+    // TAB 2: LEVANTAMIENTO
+    // ════════════════════════════════════════════════
+    let levArchivos = [];
+
+    function actualizarReloj() {
+      const ahora = new Date();
+      const opciones = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
+      document.getElementById("lev-fechaHora").textContent = ahora.toLocaleString("es-PE", opciones);
+    }
+    setInterval(actualizarReloj, 1000);
+    actualizarReloj();
+
+    const levDescEl = document.getElementById("lev-descripcion");
+    const levCharEl = document.getElementById("lev-charCount");
+    levDescEl.addEventListener("input", () => {
+      const len = levDescEl.value.length;
+      levCharEl.textContent = len + " / 600";
+      levCharEl.classList.toggle("warn", len > 500);
+    });
+
+    const levZona = document.getElementById("lev-archivos-zona");
+    levZona.addEventListener("dragover", e => { e.preventDefault(); levZona.classList.add("drag-over"); });
+    levZona.addEventListener("dragleave", () => levZona.classList.remove("drag-over"));
+    levZona.addEventListener("drop", e => {
+      e.preventDefault(); levZona.classList.remove("drag-over");
+      levProcesarArchivos(e.dataTransfer.files);
+    });
+
+    function levDetectarTipo(file) {
+      if (file.type.startsWith("image/")) return "foto";
+      if (file.type.startsWith("video/")) return "video";
+      return "otro";
+    }
+    function levFormatTamano(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / 1024 / 1024).toFixed(1) + " MB";
+    }
+    function levProcesarArchivos(fileList) {
+      const MAX = 10;
+      Array.from(fileList).forEach(file => {
+        if (levArchivos.length >= MAX) { showToast("Maximo 10 archivos", "error"); return; }
+        if (file.size > 50 * 1024 * 1024) { showToast(file.name + " supera 50 MB", "error"); return; }
+        const id = Date.now() + Math.random();
+        const tipo = levDetectarTipo(file);
+        levArchivos.push({ id, file, nombre: file.name, tipo, tamano: file.size, base64: "", estado: "procesando" });
+        levRenderArchivos();
+        if (tipo === "foto") {
+          comprimirImagen(file, 1280, 0.75, function(b64) {
+            const a = levArchivos.find(x => x.id === id);
+            if (a) { a.base64 = b64; a.estado = "listo"; levRenderArchivos(); }
+          });
+        } else {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            const a = levArchivos.find(x => x.id === id);
+            if (a) { a.base64 = ev.target.result; a.estado = "listo"; levRenderArchivos(); }
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+    function levRenderArchivos() {
+      const lista = document.getElementById("lev-archivos-lista");
+      document.getElementById("lev-count-archivos").textContent = `(${levArchivos.length} archivo${levArchivos.length !== 1 ? "s" : ""})`;
+      lista.innerHTML = levArchivos.map(a => `
+        <div class="archivo-item">
+          <div class="archivo-icono">${a.tipo === "video" ? "&#127909;" : "&#128247;"}</div>
+          <div class="archivo-info">
+            <div class="archivo-nombre">${a.nombre}</div>
+            <div class="archivo-size">${levFormatTamano(a.tamano)}</div>
+            <div class="archivo-progreso">
+              <div class="archivo-progreso-fill" style="width:${a.estado==='listo'?'100':a.estado==='procesando'?'40':'0'}%"></div>
+            </div>
+            <div class="archivo-estado ${a.estado==='listo'?'ok':a.estado==='error'?'error':'cargando'}">
+              ${a.estado==='listo'?'Listo':a.estado==='error'?'Error':'Procesando...'}
+            </div>
+          </div>
+          <button type="button" class="btn-quitar-archivo" onclick="levQuitarArchivo('${a.id}')">&#10005;</button>
+        </div>
+      `).join("");
+    }
+    function levQuitarArchivo(id) {
+      levArchivos = levArchivos.filter(a => String(a.id) !== String(id));
+      levRenderArchivos();
+    }
+
+    function validarLevantamiento() {
+      const nombre = ($("#lev-nombre").val() || "").trim();
+      const codigo = ($("#lev-codigo").val() || "").trim();
+      const desc   = (document.getElementById("lev-descripcion").value || "").trim();
+      const checks = [
+        { id: "lev-field-nombre",      invalid: !nombre },
+        { id: "lev-field-codigo",      invalid: !codigo },
+        { id: "lev-field-descripcion", invalid: !desc || desc.length < 10 },
+      ];
+      let ok = true;
+      checks.forEach(c => { const el = document.getElementById(c.id); if(el) el.classList.toggle("invalid", c.invalid); if(c.invalid) ok = false; });
+      if (levArchivos.length === 0) { showToast("Agrega al menos un archivo de evidencia", "error"); ok = false; }
+      const procesando = levArchivos.filter(a => a.estado === "procesando");
+      if (procesando.length > 0) { showToast("Espera a que los archivos terminen de procesarse", "error"); ok = false; }
+      return ok;
+    }
+
+    document.getElementById("levantamientoForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      if (!validarLevantamiento()) {
+        showToast("Completa todos los campos obligatorios", "error");
+        document.querySelector("#levantamientoForm .field.invalid")?.scrollIntoView({ behavior:"smooth", block:"center" });
+        return;
+      }
+      const btn     = document.getElementById("lev-btnEnviar");
+      const btnText = document.getElementById("lev-btnText");
+      const spinner = document.getElementById("lev-spinner");
+      btn.disabled = true; btnText.textContent = "Enviando evidencia..."; spinner.style.display = "block";
+
+      const ahora = new Date();
+      const datos = {
+        nombre:      $("#lev-nombre").val() || "",
+        codigo:      $("#lev-codigo").val() || "",
+        descripcion: document.getElementById("lev-descripcion").value.trim(),
+        fechaHora:   ahora.toISOString(),
+        archivos: levArchivos.map(a => ({ nombre: a.nombre, tipo: a.tipo, base64: a.base64 })),
+      };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          document.getElementById("lev-success-codigo").textContent =
+            "Desviacion " + res.codigo + " - " + res.archivos + " archivo(s) enviado(s)";
+          document.getElementById("form-lev-section").style.display = "none";
+          document.getElementById("lev-success-screen").style.display = "flex";
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        })
+        .withFailureHandler(function(err) {
+          showToast("Error al enviar: " + err.message, "error");
+          btn.disabled = false; btnText.textContent = "Enviar Levantamiento"; spinner.style.display = "none";
+        })
+        .registrarLevantamiento(datos);
+    });
+
+    document.getElementById("lev-btnNuevo").addEventListener("click", () => {
+      levArchivos = []; levRenderArchivos();
+      $("#lev-nombre").val("").trigger("change");
+      $("#lev-codigo").val("").trigger("change");
+      document.getElementById("lev-descripcion").value = "";
+      document.getElementById("lev-desv-box").classList.remove("visible");
+      levCharEl.textContent = "0 / 600";
+      document.querySelectorAll("#levantamientoForm .field.invalid").forEach(f => f.classList.remove("invalid"));
+      document.getElementById("lev-fileInput").value = "";
+      const btn = document.getElementById("lev-btnEnviar");
+      btn.disabled = false; document.getElementById("lev-btnText").textContent = "Enviar Levantamiento"; document.getElementById("lev-spinner").style.display = "none";
+      document.getElementById("lev-success-screen").style.display = "none";
+      document.getElementById("form-lev-section").style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    // ════════════════════════════════════════════════
+    // SELECT2
+    // ════════════════════════════════════════════════
+    document.addEventListener("DOMContentLoaded", function() {
+      $(".select-buscable-lev").select2({
+        width: "100%",
+        placeholder: "Escribe para buscar",
+        allowClear: true
+      });
+
+      $("#lev-codigo").on("change", function() {
+        const opt = $(this).find("option:selected");
+        const codigo = $(this).val() || "";
+        const box = document.getElementById("lev-desv-box");
+        if (codigo) {
+          document.getElementById("lev-desv-detalle").textContent = opt.data("detalle") || "-";
+          document.getElementById("lev-desv-meta").textContent =
+            "Responsable: " + (opt.data("responsable") || "-") +
+            "  -  Area: " + (opt.data("area") || "-") +
+            "  -  Estatus: " + (opt.data("estatus") || "-") +
+            "  -  Fecha limite: " + (opt.data("fechalimite") || "-");
+          box.classList.add("visible");
+          document.getElementById("lev-field-codigo").classList.remove("invalid");
+        } else {
+          box.classList.remove("visible");
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
