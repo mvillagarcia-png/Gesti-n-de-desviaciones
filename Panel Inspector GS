@@ -1,0 +1,333 @@
+/**
+ * PANEL INSPECTOR - BACKEND
+ * ─────────────────────────────────────────────────────────────────
+ * Funciones que usa el panel HTML del inspector:
+ *
+ *   obtenerReportesBandeja()      → lee hoja "Bandeja de Entrada"
+ *   validarYPasarAcumulado()      → completa y mueve a "Acumulado"
+ *
+ * IMPORTANTE: Agregar al doGet() existente el caso "inspector":
+ *   URL inspector: /exec?form=inspector
+ * ─────────────────────────────────────────────────────────────────
+ */
+
+
+// ============================================================
+// AGREGAR ESTE CASO AL doGet() EN FormularioTrabajador.gs
+// ============================================================
+//
+//  } else if (cual === "inspector") {
+//    const template = HtmlService.createTemplateFromFile("Panel Inspector Html");
+//    template.empresas       = obtenerEmpresas();
+//    template.tipificaciones = obtenerTipificaciones();
+//    template.responsables   = obtenerResponsables();
+//    return template.evaluate()
+//      .setTitle("Panel Inspector · CSSA")
+//      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+//
+// ============================================================
+
+
+// ============================================================
+// 1. LEER BANDEJA DE ENTRADA
+// ============================================================
+
+/**
+ * Devuelve todos los reportes de la hoja "Bandeja de Entrada"
+ * como array de objetos, listos para renderizar en la tabla.
+ */
+function obtenerReportesBandeja() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName("Bandeja de Entrada");
+  if (!hoja || hoja.getLastRow() < 2) return [];
+
+  const datos = hoja.getDataRange().getValues();
+  const result = [];
+
+  for (let i = 1; i < datos.length; i++) {
+    const fila = datos[i];
+
+    // Formato de fechas
+    const tz = Session.getScriptTimeZone();
+    let fechaEvento  = "";
+    let fechaReporte = "";
+
+    if (fila[1] instanceof Date && !isNaN(fila[1])) {
+      fechaReporte = Utilities.formatDate(fila[1], tz, "dd/MM/yyyy HH:mm");
+    }
+    if (fila[8] instanceof Date && !isNaN(fila[8])) {
+      fechaEvento = Utilities.formatDate(fila[8], tz, "dd/MM/yyyy");  // col I
+    }
+
+    result.push({
+      id:           i + 1,  // número de fila real en Sheets (fila 1 = header)
+      fechaReporte: fechaReporte,
+      codigoRef:    String(fila[2]  || ""),
+      nombre:       String(fila[3]  || ""),
+      apellidos:    String(fila[4]  || ""),
+      celular:      String(fila[5]  || ""),
+      correo:       String(fila[6]  || ""),
+      empresa:      String(fila[7]  || ""),
+      fechaEvento:  fechaEvento,
+      lugar:        String(fila[9]  || ""),
+      descripcion:  String(fila[10] || ""),
+      imgUrl:       String(fila[11] || ""),
+      propuesta:    String(fila[12] || ""),
+      estado:       String(fila[13] || ""),
+    });
+  }
+
+  // Ordenar: PENDIENTES primero, luego por fecha descendente
+  result.sort((a, b) => {
+    if (a.estado === "PENDIENTE" && b.estado !== "PENDIENTE") return -1;
+    if (a.estado !== "PENDIENTE" && b.estado === "PENDIENTE") return 1;
+    return b.id - a.id;
+  });
+
+  return result;
+}
+
+
+// ============================================================
+// 2. VALIDAR Y PASAR A ACUMULADO
+// ============================================================
+
+/**
+ * Combina los datos del trabajador (Bandeja) con los del inspector
+ * y llama a registrarFormulario() para guardar en "Acumulado".
+ * Luego marca el reporte en Bandeja como ATENDIDO.
+ *
+ * @param {number} reporteId    - ID del reporte en Bandeja de Entrada
+ * @param {string} codigoRef    - Código RPT del reporte (para trazabilidad)
+ * @param {Object} datosInspector - Campos completados por el inspector
+ * @returns {string} - Código del item en Acumulado (ej: "2025-042")
+ */
+function validarYPasarAcumulado(reporteId, codigoRef, datosInspector, base64Inspector) {
+
+  // 1) Leer fila original de Bandeja de Entrada
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const hBand = ss.getSheetByName("Bandeja de Entrada");
+  if (!hBand) throw new Error("Hoja 'Bandeja de Entrada' no encontrada.");
+
+  // reporteId ES el número de fila real en Sheets
+  const numFilaBandeja = Number(reporteId);
+  const datos = hBand.getDataRange().getValues();
+  if (numFilaBandeja < 2 || numFilaBandeja > hBand.getLastRow()) {
+    throw new Error("Fila " + numFilaBandeja + " fuera de rango en Bandeja.");
+  }
+  const filaBandeja = datos[numFilaBandeja - 1]; // getValues() es 0-indexed
+
+  // 2) Reconstruir el objeto formData completo que espera registrarFormulario()
+  //    Combina datos del trabajador + datos del inspector
+  const tz = Session.getScriptTimeZone();
+
+  // Fecha del evento (viene como Date desde Sheets o como string del inspector)
+  let fechaEventoStr = datosInspector.fecha || "";
+  if (filaBandeja[8] instanceof Date && !isNaN(filaBandeja[8])) {  // col I
+    fechaEventoStr = Utilities.formatDate(filaBandeja[8], tz, "yyyy-MM-dd");
+    // Convertir a formato dd/MM/yyyy que espera registrarFormulario
+    const partes = fechaEventoStr.split("-");
+    fechaEventoStr = partes[2] + "/" + partes[1] + "/" + partes[0];
+  }
+
+  // Fecha límite: viene en formato yyyy-MM-dd del input date del inspector
+  let fechaLimiteStr = datosInspector.fechaLimite || "";
+  if (fechaLimiteStr.includes("-")) {
+    const p = fechaLimiteStr.split("-");
+    fechaLimiteStr = p[2] + "/" + p[1] + "/" + p[0];
+  }
+
+  // 3) Resolver imagen — usar la del trabajador o guardar la del inspector
+  let imgUrl = filaBandeja[11] || "";  // L: imagen del trabajador
+
+  if ((!imgUrl || imgUrl === "") && base64Inspector && base64Inspector.length > 100) {
+    try {
+      const carpetaId = "1bxN0M9JjKgzGMmLCYxWkEBW0ByIQh_0M";
+      const carpeta   = DriveApp.getFolderById(carpetaId);
+      const contenido = base64Inspector.includes(",") ? base64Inspector.split(",")[1] : base64Inspector;
+      const blob      = Utilities.newBlob(
+        Utilities.base64Decode(contenido),
+        "image/jpeg",
+        "INSP-" + reporteId + "_inspector.jpg"
+      );
+      const archivo = carpeta.createFile(blob);
+      archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      imgUrl = archivo.getUrl();
+      hBand.getRange(numFilaBandeja, 12).setValue(imgUrl);
+      Logger.log("📷 Foto del inspector guardada: " + imgUrl);
+    } catch(e) {
+      Logger.log("⚠️ Error guardando foto del inspector: " + e.message);
+    }
+  }
+
+  const formData = {
+    // ── Del trabajador ──────────────────────────────
+    fecha:            fechaEventoStr,
+    lugar:            filaBandeja[9]  || "",  // J
+    detalle:          datosInspector.detalle || filaBandeja[10] || "",  // inspector edita primero, trabajador como fallback
+    quienReporta:     datosInspector.quienReporta || "8.VÍA WHATSAPP",
+    nombreReportante: datosInspector.nombreReportante || filaBandeja[3] || "",
+    areaReportante:   datosInspector.areaReportante   || filaBandeja[7] || "",
+
+    // ── Del inspector ───────────────────────────────
+    unidad:           datosInspector.unidad           || "",
+    aspecto:          datosInspector.aspecto           || "",
+    claseEvento:      datosInspector.claseEvento       || "",
+    severidadEvento:  datosInspector.severidadEvento   || "",
+    diasPerdidos:     datosInspector.diasPerdidos      || "",
+    empresa:          datosInspector.empresa           || "",
+    area:             datosInspector.area              || filaBandeja[7] || "",
+    tipificacion:     datosInspector.tipificacion      || "",
+    desglose1:        datosInspector.desglose1         || "",
+    desglose2:        datosInspector.desglose2         || "",
+    actoCondicion:    datosInspector.actoCondicion     || "",
+    probabilidad:     datosInspector.probabilidad      || "",
+    severidadTexto:   datosInspector.severidadTexto    || "",
+    criticidad:       datosInspector.criticidad        || "",
+    nombreRelacion1:  datosInspector.nombreRelacion1   || "",
+    nombreRelacion2:  datosInspector.nombreRelacion2   || "",
+    causasInmediatas: datosInspector.causasInmediatas  || "",
+    causasBasicas:    datosInspector.causasBasicas     || "",
+    accionCorrectiva: datosInspector.accionCorrectiva  || "",
+    accionPreventiva: datosInspector.accionPreventiva  || "",
+    responsable:      datosInspector.responsable       || "",
+    fechaLimite:      fechaLimiteStr,
+    status:           datosInspector.status            || "",
+    _imgUrlExistente: imgUrl || "",  // imagen resuelta (trabajador o inspector)
+  };
+
+  const resultado = registrarFormulario(formData, null);
+  // registrarFormulario devuelve "✅ ITEM YYYY-NNN registrado con éxito."
+  // Extraemos solo el código
+  const codigoAcumulado = resultado.replace("✅ ITEM ", "").replace(" registrado con éxito.", "");
+
+  // 4) Si había imagen, actualizar la celda de la nueva fila en Acumulado
+  //    con el link de Drive que ya existe
+  if (imgUrl) {
+    const hAcum = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Acumulado");
+    if (hAcum) {
+      const uF = hAcum.getLastRow();
+      hAcum.getRange("AX" + uF).setFormula(`=HYPERLINK("${imgUrl}", "ver imagen")`);
+      hAcum.getRange("AY" + uF).setValue(imgUrl);
+    }
+  }
+
+  // 5) Marcar reporte en Bandeja como ATENDIDO
+  const ahora     = new Date();
+  const fechaStr  = Utilities.formatDate(ahora, tz, "dd/MM/yyyy HH:mm");
+  hBand.getRange(numFilaBandeja, 14).setValue("ATENDIDO");           // N: Estado
+  hBand.getRange(numFilaBandeja, 1, 1, 14).setBackground("#e6f6ed");   // Verde claro
+
+  // 6) Agregar nota de trazabilidad: código RPT → código Acumulado
+  const nota = hBand.getRange(numFilaBandeja, 3).getNote() || "";
+  hBand.getRange(numFilaBandeja, 3)
+    .setNote((nota ? nota + "\n" : "") + "→ Acumulado: " + codigoAcumulado);
+
+  Logger.log("✅ Reporte " + codigoRef + " → Acumulado: " + codigoAcumulado);
+
+  // Enviar correo de confirmación al trabajador si dejó correo
+  const correoTrabajador = filaBandeja[6] || ""; // col G = correo
+  if (correoTrabajador.trim() !== "") {
+    try {
+      const nombreTrabajador = filaBandeja[3] || "";
+      const asunto = "✅ Tu reporte fue registrado · " + codigoAcumulado + " · CSSA SMA";
+      const htmlBody = `
+        <div style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto; background:#f5f7fa; padding:24px;">
+          <div style="background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <div style="background:#0058a3; padding:24px 28px;">
+              <div style="color:white; font-size:20px; font-weight:700;">✅ Reporte Registrado Oficialmente</div>
+              <div style="color:rgba(255,255,255,0.85); font-size:13px; margin-top:4px;">CSSA · Seguridad y Medio Ambiente</div>
+            </div>
+            <div style="padding:28px;">
+              <p style="color:#1c2b3a; font-size:15px; margin:0 0 16px;">Estimado/a <strong>${nombreTrabajador}</strong>,</p>
+              <p style="color:#4a5568; font-size:14px; line-height:1.6; margin:0 0 20px;">
+                Tu reporte de seguridad fue revisado y <strong>registrado oficialmente</strong> en el sistema de gestión de desviaciones CSSA.
+              </p>
+              <div style="background:#e6f6ed; border-left:4px solid #27ae60; border-radius:0 8px 8px 0; padding:14px 16px; margin:0 0 24px; text-align:center;">
+                <div style="font-size:12px; color:#27ae60; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Código de Registro</div>
+                <div style="font-size:28px; font-weight:700; color:#1c2b3a; letter-spacing:2px;">${codigoAcumulado}</div>
+                <div style="font-size:12px; color:#718096; margin-top:4px;">Guarda este código para seguimiento</div>
+              </div>
+              <p style="color:#4a5568; font-size:14px; line-height:1.6; margin:0 0 24px;">
+                El equipo de Seguridad y Medio Ambiente gestionará las acciones correctivas correspondientes.
+              </p>
+              <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-top:8px;">
+                <div style="font-size:13px; color:#718096;">Equipo de Seguridad y Medio Ambiente · CSSA</div>
+                <div style="font-size:12px; color:#a0aec0; margin-top:4px;">Este es un mensaje automático, no responder a este correo.</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      GmailApp.sendEmail(correoTrabajador.trim(), asunto, "", { htmlBody: htmlBody });
+      Logger.log("📧 Correo de aprobación enviado a: " + correoTrabajador);
+    } catch(e) {
+      Logger.log("⚠️ Error enviando correo de aprobación: " + e.message);
+    }
+  }
+
+  return codigoAcumulado;
+}
+
+// ============================================================
+// ANULAR REPORTE — elimina de Bandeja y notifica al trabajador
+// ============================================================
+
+function anularReporte(reporteId, correoTrabajador, nombreTrabajador, motivo) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const hBand = ss.getSheetByName("Bandeja de Entrada");
+  if (!hBand) throw new Error("No se encontró la hoja Bandeja de Entrada");
+
+  // reporteId ES el número de fila real en Sheets
+  const numFila = Number(reporteId);
+  if (numFila < 2 || numFila > hBand.getLastRow()) {
+    throw new Error("Fila " + numFila + " fuera de rango en Bandeja.");
+  }
+
+  // Eliminar la fila de la Bandeja
+  hBand.deleteRow(numFila);
+  Logger.log("🚫 Reporte ID " + reporteId + " eliminado de la Bandeja");
+
+  // Enviar correo al trabajador si dejó correo
+  if (correoTrabajador && correoTrabajador.trim() !== "") {
+    try {
+      const urlFormulario = ScriptApp.getService().getUrl() + "?form=trabajador";
+      const asunto = "🚫 Tu reporte de seguridad fue revisado · CSSA SMA";
+      const htmlBody = `
+        <div style="font-family:Arial,sans-serif; max-width:600px; margin:0 auto; background:#f5f7fa; padding:24px;">
+          <div style="background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+            <div style="background:#c0392b; padding:24px 28px;">
+              <div style="color:white; font-size:20px; font-weight:700;">🚫 Reporte Revisado — No Registrado</div>
+              <div style="color:rgba(255,255,255,0.85); font-size:13px; margin-top:4px;">CSSA · Seguridad y Medio Ambiente</div>
+            </div>
+            <div style="padding:28px;">
+              <p style="color:#1c2b3a; font-size:15px; margin:0 0 16px;">Estimado/a <strong>${nombreTrabajador}</strong>,</p>
+              <p style="color:#4a5568; font-size:14px; line-height:1.6; margin:0 0 20px;">
+                Tu reporte de seguridad fue revisado por el equipo de inspección SMA. 
+                Lamentablemente, <strong>no pudo ser registrado en el sistema</strong> por el siguiente motivo:
+              </p>
+              <div style="background:#fff0ee; border-left:4px solid #c0392b; border-radius:0 8px 8px 0; padding:14px 16px; margin:0 0 24px;">
+                <div style="font-size:12px; color:#c0392b; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Motivo</div>
+                <div style="font-size:14px; color:#1c2b3a; line-height:1.5;">${motivo}</div>
+              </div>
+              <p style="color:#4a5568; font-size:14px; line-height:1.6; margin:0 0 24px;">
+                Si consideras que el reporte es válido o deseas corregir la información, 
+                puedes contactar directamente al equipo SMA.
+              </p>
+              <div style="border-top:1px solid #e2e8f0; padding-top:20px; margin-top:8px;">
+                <div style="font-size:13px; color:#718096;">Equipo de Seguridad y Medio Ambiente · CSSA</div>
+                <div style="font-size:12px; color:#a0aec0; margin-top:4px;">Este es un mensaje automático, no responder a este correo.</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+      GmailApp.sendEmail(correoTrabajador.trim(), asunto, "", { htmlBody: htmlBody });
+      Logger.log("📧 Correo de anulación enviado a: " + correoTrabajador);
+    } catch(e) {
+      Logger.log("⚠️ Error enviando correo de anulación: " + e.message);
+    }
+  }
+
+  return true;
+}
