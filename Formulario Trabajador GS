@@ -1,0 +1,340 @@
+/**
+ * FORMULARIO DE REPORTE - TRABAJADORES
+ * Archivo: Formulario Trabajador.gs
+ */
+
+// ============================================================
+// 1. SERVICIO WEB (doGet) — UNIFICADO
+// ============================================================
+
+function doGet(e) {
+  const cual = e && e.parameter && e.parameter.form;
+
+  if (cual === "trabajador") {
+    const template = HtmlService.createTemplateFromFile("Formulario Trabajador Html");
+    template.nombres                = obtenerNombresCompletos();
+    template.nombresPersonal        = obtenerNombresPersonal();
+    template.desviacionesPendientes = obtenerDesviacionesPendientesLev();
+    return template.evaluate()
+      .setTitle("Portal SMA · CSSA")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+
+  } else if (cual === "inspector") {
+    const template = HtmlService.createTemplateFromFile("Panel Inspector Html");
+    template.empresas          = obtenerEmpresas();
+    template.tipificaciones    = obtenerTipificaciones();
+    template.responsables      = obtenerResponsables();
+    template.subAreas          = obtenerSubAreas();
+    template.nombresPersonal   = obtenerNombresPersonal();
+    template.quienReportaOpts  = obtenerQuienReporta();
+    return template.evaluate()
+      .setTitle("Panel Inspector · CSSA")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+
+  } else if (cual === "inspeccion") {
+    const template = HtmlService.createTemplateFromFile("Formulario Inspeccion Html");
+    template.responsables = obtenerResponsables();
+    return template.evaluate()
+      .setTitle("Inspección SMA · Cementos Pacasmayo")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+
+  } else {
+    const template = HtmlService.createTemplateFromFile("Formulario Evento Html");
+    template.nombres        = obtenerNombresCompletos();
+    template.empresas       = obtenerEmpresas();
+    template.tipificaciones = obtenerTipificaciones();
+    template.responsables   = obtenerResponsables();
+    return template.evaluate()
+      .setTitle("Formulario de Eventos")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+}
+
+// ============================================================
+// 2. REGISTRO EN BANDEJA DE ENTRADA
+// ============================================================
+
+function registrarReporteTrabajador(data, archivos) {
+
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja   = ss.getSheetByName("Bandeja de Entrada");
+
+  if (!hoja) {
+    hoja = ss.insertSheet("Bandeja de Entrada");
+    hoja.appendRow([
+      "ID", "FECHA REPORTE", "CÓDIGO REF", "NOMBRE TRABAJADOR",
+      "APELLIDOS", "CELULAR", "CORREO", "EMPRESA", "FECHA EVENTO", "LUGAR", "DESCRIPCIÓN",
+      "ARCHIVOS URLS", "PROPUESTA", "ESTADO"
+    ]);
+    hoja.getRange(1, 1, 1, 14)
+      .setBackground("#1c2b3a")
+      .setFontColor("#f0a500")
+      .setFontWeight("bold");
+    hoja.setFrozenRows(1);
+  }
+
+  const ahora      = new Date();
+  const ultimaFila = hoja.getLastRow();
+  const id         = ultimaFila;
+
+  let fechaEvento = null;
+  if (data.fecha) {
+    const partes = data.fecha.split("-");
+    fechaEvento  = new Date(partes[0], partes[1] - 1, partes[2]);
+  }
+
+  const listaUrls = guardarArchivosReporteTrabajador(archivos, "RPT-" + id);
+  const urlsStr   = listaUrls.join(" | ");
+
+  hoja.appendRow([
+    id,
+    ahora,
+    "",
+    data.nombre,
+    data.apellidos || "",
+    data.celular   || "",
+    data.correo    || "",
+    data.empresa   || "",
+    fechaEvento,
+    data.lugar,
+    data.descripcion,
+    urlsStr,
+    data.propuesta || "",
+    "PENDIENTE",
+  ]);
+
+  const uF = hoja.getLastRow();
+  hoja.getRange(uF, 2).setNumberFormat("dd/MM/yyyy HH:mm");
+  hoja.getRange(uF, 9).setNumberFormat("dd/MM/yyyy");
+  hoja.getRange(uF, 1, 1, 14).setBackground("#fff9e6");
+
+  enviarAlertaInspector(data, listaUrls, ahora);
+
+  Logger.log("✅ Reporte trabajador guardado. Archivos: " + listaUrls.length + " | ID: " + id);
+  return "PENDIENTE";
+}
+
+// ============================================================
+// 3. CORREO DE ALERTA AL INSPECTOR
+// ============================================================
+
+function enviarAlertaInspector(data, listaUrls, fechaReporte) {
+
+  const DESTINATARIOS = "mvillagarcia@cssa.com.pe,evasquezp@cssa.com.pe,esuxe@cssa.com.pe";
+  const tz            = Session.getScriptTimeZone();
+  const fechaStr      = Utilities.formatDate(fechaReporte, tz, "dd/MM/yyyy 'a las' HH:mm");
+  const asunto        = "🔔 Nuevo reporte SMA · " + data.nombre + " · " + fechaStr;
+  const urlPanel      = ScriptApp.getService().getUrl() + "?form=inspector";
+
+  let filasEvidencia = "";
+  if (listaUrls.length > 0) {
+    listaUrls.forEach(function(url, i) {
+      const esVideo = /\.(mp4|mov|avi)/i.test(url);
+      const icono   = esVideo ? "🎬" : "📷";
+      const etiq    = esVideo ? "Ver video" : "Ver imagen";
+      const num     = listaUrls.length > 1 ? " " + (i + 1) : "";
+      const bg      = i % 2 === 0 ? "#f9fafb" : "#fff";
+      filasEvidencia +=
+        '<tr style="background:' + bg + ';">'
+        + '<td style="padding:8px 6px;color:#6b7280;font-weight:600;">' + icono + ' Evidencia' + num + '</td>'
+        + '<td style="padding:8px 6px;">'
+        + '<a href="' + url + '" target="_blank" style="color:#CE000C;font-weight:600;text-decoration:none;">' + etiq + num + ' →</a>'
+        + '</td></tr>';
+    });
+  } else {
+    filasEvidencia =
+      '<tr style="background:#f9fafb;">'
+      + '<td style="padding:8px 6px;color:#6b7280;font-weight:600;">Evidencia</td>'
+      + '<td style="padding:8px 6px;color:#9ca3af;">Sin archivos adjuntos</td>'
+      + '</tr>';
+  }
+
+  const htmlBody =
+    '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f5f5;padding:20px;">'
+    + '<div style="background:white;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">'
+    + '<div style="background:#111111;padding:18px 24px;">'
+    + '<span style="color:white;font-weight:700;font-size:17px;">Pacasmayo</span>'
+    + '<div style="width:12px;height:12px;background:#CE000C;display:inline-block;margin-left:8px;"></div>'
+    + '<span style="color:rgba(255,255,255,0.5);font-size:12px;margin-left:6px;">Seguridad y Medio Ambiente</span>'
+    + '</div>'
+    + '<div style="background:#CE000C;padding:14px 24px;">'
+    + '<div style="color:white;font-size:16px;font-weight:700;">🔔 Nuevo Reporte de Desviación</div>'
+    + '<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:2px;">Requiere revisión en el Panel Inspector SMA</div>'
+    + '</div>'
+    + '<div style="padding:24px;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+    + '<tr><td style="padding:8px 0;color:#6b7280;font-weight:600;width:140px;">Reportado por</td><td style="padding:8px 0;color:#111111;font-weight:600;">' + data.nombre + '</td></tr>'
+    + '<tr style="background:#f9fafb;"><td style="padding:8px 6px;color:#6b7280;font-weight:600;">Empresa</td><td style="padding:8px 6px;color:#111111;">' + (data.empresa || "—") + '</td></tr>'
+    + '<tr><td style="padding:8px 0;color:#6b7280;font-weight:600;">Lugar</td><td style="padding:8px 0;color:#111111;">' + data.lugar + '</td></tr>'
+    + '<tr style="background:#f9fafb;"><td style="padding:8px 6px;color:#6b7280;font-weight:600;">Fecha del reporte</td><td style="padding:8px 6px;color:#111111;">' + fechaStr + '</td></tr>'
+    + '<tr><td style="padding:8px 0;color:#6b7280;font-weight:600;vertical-align:top;">Descripción</td><td style="padding:8px 0;color:#111111;line-height:1.5;">' + data.descripcion + '</td></tr>'
+    + filasEvidencia
+    + '</table>'
+    + (listaUrls.length > 0 ? '<p style="font-size:12px;color:#6b7280;margin:16px 0 0;">📎 Las imágenes también van adjuntas a este correo.</p>' : '')
+    + '<div style="text-align:center;margin-top:24px;">'
+    + '<a href="' + urlPanel + '" style="background:#CE000C;color:white;text-decoration:none;padding:12px 28px;border-radius:3px;font-weight:700;font-size:14px;display:inline-block;">→ Abrir Panel Inspector</a>'
+    + '</div></div>'
+    + '<div style="padding:14px 24px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;">Mensaje automático · Sistema de gestión de desviaciones SMA · Cementos Pacasmayo</div>'
+    + '</div></div>';
+
+  const adjuntos = [];
+  const idsYaProcesados = new Set();
+
+  listaUrls.forEach(function(url) {
+    try {
+      const matchId = url.match(/[-\w]{25,}/);
+      if (!matchId) return;
+      const fileId = matchId[0];
+      if (idsYaProcesados.has(fileId)) return;
+      idsYaProcesados.add(fileId);
+      const archivo  = DriveApp.getFileById(fileId);
+      const mimeType = archivo.getMimeType() || "";
+      if (mimeType.startsWith("image/")) adjuntos.push(archivo.getBlob());
+    } catch(e) {
+      Logger.log("⚠️ No se pudo adjuntar: " + e.message);
+    }
+  });
+
+  const opciones = { to: DESTINATARIOS, subject: asunto, htmlBody: htmlBody };
+  if (adjuntos.length > 0) opciones.attachments = adjuntos;
+
+  MailApp.sendEmail(opciones);
+  Logger.log("📧 Alerta SMA enviada → " + DESTINATARIOS);
+}
+
+// ============================================================
+// 4. GUARDAR ARCHIVOS EN GOOGLE DRIVE
+// ============================================================
+
+function guardarArchivosReporteTrabajador(archivos, codigoRef) {
+  const urls = [];
+  try {
+    const carpetaId = "1bxN0M9JjKgzGMmLCYxWkEBW0ByIQh_0M";
+    const carpeta   = DriveApp.getFolderById(carpetaId);
+
+    if (typeof archivos === "string" && archivos.length > 100) {
+      const url = guardarArchivoIndividual(carpeta, archivos, codigoRef + "_trabajador.png", "image/png");
+      if (url) urls.push(url);
+      return urls;
+    }
+
+    if (!Array.isArray(archivos) || archivos.length === 0) return urls;
+
+    archivos.forEach(function(archivo, idx) {
+      try {
+        if (!archivo.base64 || archivo.base64.length < 100) return;
+        let mimeType  = "image/jpeg";
+        let extension = ".jpg";
+        if (archivo.tipo === "video" || (archivo.nombre && archivo.nombre.match(/\.(mp4|mov|avi)$/i))) {
+          mimeType = "video/mp4"; extension = ".mp4";
+        } else if (archivo.nombre && archivo.nombre.match(/\.png$/i)) {
+          mimeType = "image/png"; extension = ".png";
+        }
+        const nombreArchivo = codigoRef + "_" + (idx + 1) + extension;
+        const url = guardarArchivoIndividual(carpeta, archivo.base64, nombreArchivo, mimeType);
+        if (url) urls.push(url);
+      } catch(errArchivo) {
+        Logger.log("⚠️ Error al guardar archivo " + idx + ": " + errArchivo.message);
+      }
+    });
+  } catch(err) {
+    Logger.log("⚠️ Error en guardarArchivosReporteTrabajador: " + err.message);
+  }
+  return urls;
+}
+
+function guardarArchivoIndividual(carpeta, base64, nombreArchivo, mimeType) {
+  try {
+    const contenido = base64.includes(",") ? base64.split(",")[1] : base64;
+    const blob    = Utilities.newBlob(Utilities.base64Decode(contenido), mimeType, nombreArchivo);
+    const archivo = carpeta.createFile(blob);
+    archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return archivo.getUrl();
+  } catch(err) {
+    Logger.log("⚠️ Error al guardar " + nombreArchivo + ": " + err.message);
+    return "";
+  }
+}
+
+// ============================================================
+// 5. ALERTA DE REPORTES PENDIENTES (+48H)
+// ============================================================
+
+function alertarReportesPendientes() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName("Bandeja de Entrada");
+  if (!hoja || hoja.getLastRow() < 2) return;
+
+  const INSPECTOR_PRINCIPAL = "mvillagarcia@cssa.com.pe";
+  const COPIA               = "evasquezp@cssa.com.pe,esuxe@cssa.com.pe";
+  const HORAS_LIMITE        = 48;
+  const ahora               = new Date();
+  const tz                  = Session.getScriptTimeZone();
+  const urlPanel            = ScriptApp.getService().getUrl() + "?form=inspector";
+
+  const datos = hoja.getDataRange().getValues();
+  const pendientesVencidos = [];
+
+  for (let i = 1; i < datos.length; i++) {
+    const fila   = datos[i];
+    const estado = fila[13];
+    if (estado !== "PENDIENTE") continue;
+
+    const fechaReporte = fila[1];
+    if (!(fechaReporte instanceof Date)) continue;
+
+    const horasTranscurridas = (ahora - fechaReporte) / (1000 * 60 * 60);
+    if (horasTranscurridas < HORAS_LIMITE) continue;
+
+    pendientesVencidos.push({
+      codigo:      fila[2],
+      nombre:      fila[3],
+      empresa:     fila[7],
+      lugar:       fila[9],
+      descripcion: fila[10],
+      fechaStr:    Utilities.formatDate(fechaReporte, tz, "dd/MM/yyyy HH:mm"),
+      horas:       Math.floor(horasTranscurridas)
+    });
+  }
+
+  if (pendientesVencidos.length === 0) { Logger.log("✅ Sin reportes pendientes vencidos."); return; }
+
+  const total  = pendientesVencidos.length;
+  const asunto = "⚠️ " + total + " reporte" + (total > 1 ? "s" : "") + " pendiente" + (total > 1 ? "s" : "") + " sin atender · CSSA SMA";
+
+  const filasHtml = pendientesVencidos.map(r =>
+    '<tr>'
+    + '<td style="padding:8px 10px;border-bottom:1px solid #eee;font-weight:600;">' + r.codigo + '</td>'
+    + '<td style="padding:8px 10px;border-bottom:1px solid #eee;">' + r.nombre + '</td>'
+    + '<td style="padding:8px 10px;border-bottom:1px solid #eee;">' + (r.empresa || "—") + '</td>'
+    + '<td style="padding:8px 10px;border-bottom:1px solid #eee;">' + r.lugar + '</td>'
+    + '<td style="padding:8px 10px;border-bottom:1px solid #eee;">' + r.fechaStr + '</td>'
+    + '<td style="padding:8px 10px;border-bottom:1px solid #eee;color:#e03e3e;font-weight:600;">' + r.horas + 'h</td>'
+    + '</tr>'
+  ).join("");
+
+  const htmlBody =
+    '<div style="font-family:Arial,sans-serif;color:#333;max-width:700px;">'
+    + '<div style="background:#1c2b3a;padding:20px;border-bottom:3px solid #e03e3e;">'
+    + '<h2 style="color:#e03e3e;margin:0;">⚠️ Reportes pendientes sin atender</h2>'
+    + '</div>'
+    + '<div style="padding:20px;">'
+    + '<p>Los siguientes reportes llevan más de <b>' + HORAS_LIMITE + ' horas</b> sin ser atendidos:</p>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="background:#f0f2f5;">'
+    + '<th style="padding:8px 10px;text-align:left;">Código</th>'
+    + '<th style="padding:8px 10px;text-align:left;">Trabajador</th>'
+    + '<th style="padding:8px 10px;text-align:left;">Empresa</th>'
+    + '<th style="padding:8px 10px;text-align:left;">Lugar</th>'
+    + '<th style="padding:8px 10px;text-align:left;">Recibido</th>'
+    + '<th style="padding:8px 10px;text-align:left;">Espera</th>'
+    + '</tr></thead>'
+    + '<tbody>' + filasHtml + '</tbody>'
+    + '</table>'
+    + '<div style="margin-top:20px;text-align:center;">'
+    + '<a href="' + urlPanel + '" style="background:#f0a500;color:#1c2b3a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;">Ir al Panel del Inspector →</a>'
+    + '</div></div></div>';
+
+  MailApp.sendEmail({ to: INSPECTOR_PRINCIPAL, cc: COPIA, subject: asunto, htmlBody: htmlBody });
+  Logger.log("⚠️ Alerta enviada: " + total + " reporte(s) pendiente(s).");
+}
