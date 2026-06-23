@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Inspector · Cementos Pacasmayo SMA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <style>
+    :root {
+      --bg:#f0f2f4;--surface:#ffffff;--border:#e5e7eb;--ink:#111111;--ink-soft:#444444;
+      --ink-muted:#6b7280;--accent:#CE000C;--accent-bg:#fff5f5;--warn:#CE000C;--warn-bg:#fff5f5;
+      --ok:#16a34a;--ok-bg:#f0fdf4;--danger:#CE000C;--danger-bg:#fff5f5;--radius:3px;
+      --shadow:0 1px 2px rgba(0,0,0,0.06),0 2px 8px rgba(0,0,0,0.04);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Montserrat',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;}
+    .topbar{background:#111111;padding:0 28px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+    .topbar-left{display:flex;align-items:center;gap:14px;}
+    .topbar-divider{width:1px;height:24px;background:rgba(255,255,255,0.15);}
+    .topbar-subtitle{font-size:12px;color:rgba(255,255,255,0.5);letter-spacing:0.8px;text-transform:uppercase;}
+    .topbar-right{display:flex;align-items:center;gap:10px;}
+    .badge-inspector{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:4px 12px;font-size:12px;color:rgba(255,255,255,0.7);}
+    .nav-tabs{display:flex;gap:4px;padding:0 28px;background:#1a1a1a;border-bottom:1px solid rgba(255,255,255,0.1);}
+    .nav-tab{padding:10px 16px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;font-family:'Montserrat',sans-serif;border-bottom:2px solid transparent;transition:all 0.15s;}
+    .nav-tab:hover{color:rgba(255,255,255,0.8);}
+    .nav-tab.active{color:white;border-bottom-color:#CE000C;}
+    #vista-bandeja{padding:28px;max-width:1100px;margin:0 auto;}
+    .page-title{font-family:'Montserrat',sans-serif;font-weight:800;font-size:26px;color:var(--ink);margin-bottom:4px;}
+    .page-sub{font-size:13px;color:var(--ink-muted);margin-bottom:24px;}
+    .filtros{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+    .filtro-btn{padding:6px 16px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);font-family:'Montserrat',sans-serif;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;transition:all 0.15s;}
+    .filtro-btn.active,.filtro-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);}
+    .tabla-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--border);}
+    .tabla-header{display:grid;grid-template-columns:90px 1fr 140px 120px 100px 110px;padding:10px 20px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-muted);}
+    .tabla-fila{display:grid;grid-template-columns:90px 1fr 140px 120px 100px 110px;padding:14px 20px;border-bottom:1px solid var(--border);align-items:center;transition:background 0.1s;cursor:pointer;}
+    .tabla-fila:last-child{border-bottom:none;}
+    .tabla-fila:hover{background:var(--accent-bg);}
+    .tabla-fila.pendiente{border-left:3px solid var(--warn);}
+    .tabla-fila.atendido{border-left:3px solid var(--ok);}
+    .col-codigo{font-size:12px;font-weight:500;color:var(--accent);}
+    .col-trabajador{font-size:14px;font-weight:500;}
+    .col-area{font-size:13px;color:var(--ink-soft);}
+    .col-fecha{font-size:12px;color:var(--ink-soft);}
+    .col-desc{font-size:13px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .estado-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;letter-spacing:0.4px;}
+    .estado-badge.pendiente{background:var(--warn-bg);color:#8a5f00;}
+    .estado-badge.atendido{background:var(--ok-bg);color:var(--ok);}
+    .btn-atender{background:var(--accent);color:white;border:none;border-radius:6px;padding:6px 14px;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:background 0.15s;}
+    .btn-atender:hover{background:#a50009;}
+    .btn-ver{background:transparent;color:var(--ink-muted);border:1px solid var(--border);border-radius:6px;padding:6px 14px;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:500;cursor:pointer;}
+    .empty-state{text-align:center;padding:60px 20px;color:var(--ink-muted);}
+    .empty-icon{font-size:48px;margin-bottom:12px;}
+    .empty-text{font-size:15px;}
+    #vista-validacion{display:none;padding:28px;max-width:1200px;margin:0 auto;}
+    .panel-nav{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+    .btn-back{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:500;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.15s;}
+    .btn-back:hover{border-color:var(--accent);color:var(--accent);}
+    .panel-titulo{font-family:'Montserrat',sans-serif;font-weight:800;font-size:22px;}
+    .panel-codigo{font-size:13px;color:var(--accent);background:var(--accent-bg);padding:3px 10px;border-radius:4px;font-weight:500;}
+    .panel-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;}
+    .card-trabajador{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;position:sticky;top:76px;}
+    .card-trabajador-header{background:var(--ink);padding:16px 20px;display:flex;align-items:center;gap:10px;}
+    .card-trabajador-header h3{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.8px;}
+    .dot-live{width:8px;height:8px;background:var(--warn);border-radius:50%;animation:pulse 1.5s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+    .card-trabajador-body{padding:20px;}
+    .dato-item{margin-bottom:16px;}
+    .dato-item:last-child{margin-bottom:0;}
+    .dato-label{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink-muted);margin-bottom:4px;}
+    .dato-value{font-size:14px;color:var(--ink);font-weight:500;line-height:1.5;}
+    .dato-value.mono{font-size:13px;}
+    .dato-desc{font-size:13px;color:var(--ink-soft);line-height:1.6;background:var(--bg);padding:10px 12px;border-radius:6px;border-left:3px solid var(--warn);}
+    .btn-ver-img{display:inline-flex;align-items:center;gap:6px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;text-decoration:none;transition:all 0.15s;}
+    .btn-ver-img:hover{background:var(--accent);color:white;}
+    .card-inspector{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;}
+    .card-inspector-header{background:var(--accent);padding:16px 24px;}
+    .card-inspector-header h3{font-size:15px;font-weight:600;color:white;}
+    .card-inspector-header p{font-size:12px;color:rgba(255,255,255,0.65);margin-top:2px;}
+    .card-inspector-body{padding:24px;}
+    .insp-section{margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--border);}
+    .insp-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+    .insp-section-title{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .insp-section-title::after{content:'';flex:1;height:1px;background:var(--accent-bg);}
+    .insp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    .insp-grid.cols-1{grid-template-columns:1fr;}
+    .insp-grid.cols-3{grid-template-columns:1fr 1fr 1fr;}
+    .field{display:flex;flex-direction:column;gap:5px;}
+    .field.span-2{grid-column:span 2;}
+    .field label{font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-soft);}
+    .field input,.field select,.field textarea{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;color:var(--ink);font-family:'Montserrat',sans-serif;font-size:14px;padding:9px 12px;outline:none;transition:border-color 0.15s,box-shadow 0.15s;width:100%;-webkit-appearance:none;}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);background:white;box-shadow:0 0 0 3px rgba(206,0,12,0.1);}
+    .field input[type="date"]{-webkit-appearance:auto;appearance:auto;cursor:pointer;}
+    .field input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;padding:2px;opacity:0.6;}
+    .field textarea{resize:vertical;min-height:80px;line-height:1.5;}
+    .riesgo-display{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;padding:9px 12px;font-size:18px;font-weight:500;text-align:center;color:var(--ink-muted);transition:all 0.2s;}
+    .riesgo-display.bajo{background:var(--ok-bg);color:var(--ok);border-color:var(--ok);}
+    .riesgo-display.medio{background:var(--warn-bg);color:#8a5f00;border-color:var(--warn);}
+    .riesgo-display.alto{background:var(--danger-bg);color:var(--danger);border-color:var(--danger);}
+    .select2-container{width:100%!important;}
+    .select2-container--default .select2-selection--single{background:var(--bg);border:1.5px solid var(--border);border-radius:6px;height:40px;display:flex;align-items:center;}
+    .select2-container--default .select2-selection--single .select2-selection__rendered{color:var(--ink);font-family:'Montserrat',sans-serif;font-size:14px;line-height:40px;padding-left:12px;}
+    .select2-container--default .select2-selection--single .select2-selection__placeholder{color:var(--ink-muted);}
+    .select2-container--default .select2-selection--single .select2-selection__arrow{height:40px;right:8px;}
+    .select2-container--default.select2-container--focus .select2-selection--single{border-color:var(--accent);background:white;box-shadow:0 0 0 3px rgba(206,0,12,0.1);outline:none;}
+    .select2-dropdown{border:1.5px solid var(--accent);border-radius:6px;box-shadow:var(--shadow);}
+    .select2-search--dropdown .select2-search__field{border:1.5px solid var(--border);border-radius:6px;padding:7px 10px;font-family:'Montserrat',sans-serif;font-size:13px;outline:none;}
+    .select2-search--dropdown .select2-search__field:focus{border-color:var(--accent);}
+    .select2-results__option{font-family:'Montserrat',sans-serif;font-size:13px;padding:9px 12px;}
+    .select2-container--default .select2-results__option--highlighted[aria-selected]{background:var(--accent);}
+    .btn-validar{width:100%;background:var(--accent);color:white;border:none;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:16px;font-weight:700;padding:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.15s,transform 0.1s;margin-top:8px;}
+    .btn-validar:hover{background:#a50009;}
+    .btn-validar:active{transform:scale(0.99);}
+    .btn-validar:disabled{background:var(--border);color:var(--ink-muted);cursor:not-allowed;}
+    .spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;display:none;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);padding:13px 24px;border-radius:8px;font-size:14px;font-weight:600;z-index:999;transition:transform 0.35s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 24px rgba(0,0,0,0.2);white-space:nowrap;}
+    .toast.show{transform:translateX(-50%) translateY(0);}
+    .toast.ok{background:var(--ok);color:white;}
+    .toast.error{background:var(--danger);color:white;}
+    #vista-exito{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center;padding:40px;gap:14px;}
+    .exito-icon{font-size:64px;animation:pop 0.5s cubic-bezier(.34,1.56,.64,1);}
+    @keyframes pop{0%{transform:scale(0);opacity:0;}100%{transform:scale(1);opacity:1;}}
+    .exito-titulo{font-family:'Montserrat',sans-serif;font-weight:800;font-size:30px;color:var(--ok);}
+    .exito-sub{font-size:15px;color:var(--ink-muted);max-width:360px;line-height:1.6;}
+    .exito-codigo{font-size:20px;font-weight:500;color:var(--accent);background:var(--accent-bg);padding:10px 24px;border-radius:8px;border:1px solid var(--accent);}
+    .btn-volver-bandeja{margin-top:8px;background:var(--ink);color:white;border:none;border-radius:8px;padding:12px 28px;font-family:'Montserrat',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:background 0.15s;}
+    .btn-volver-bandeja:hover{background:#0f1923;}
+    .btn-adjuntar-foto{display:inline-block;background:#f9fafb;border:1px dashed #d1d5db;border-radius:3px;padding:7px 14px;font-size:12px;font-weight:600;color:#444;transition:all 0.15s;}
+    .btn-adjuntar-foto:hover{border-color:#CE000C;color:#CE000C;background:#fff5f5;}
+
+    /* ── EVIDENCIAS ── */
+    #vista-evidencias{padding:28px;max-width:1100px;margin:0 auto;display:none;}
+    .ev-card{background:white;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;overflow:hidden;box-shadow:var(--shadow);}
+    .ev-header{padding:12px 18px;background:#f8f9fa;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+    .ev-codigo{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.5px;}
+    .ev-badge-pend{background:#FEF3C7;color:#92400E;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;letter-spacing:0.3px;}
+    .ev-body{padding:18px;}
+    .ev-meta{font-size:12px;color:var(--ink-muted);margin-bottom:14px;}
+
+    /* Bloque desviación original */
+    .ev-desviacion-original{background:#fff8f0;border:1px solid #fed7aa;border-radius:6px;padding:14px 16px;margin-bottom:14px;}
+    .ev-desviacion-original-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#c2410c;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+    .ev-desviacion-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .ev-dato{display:flex;flex-direction:column;gap:2px;}
+    .ev-dato-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#9a3412;}
+    .ev-dato-valor{font-size:13px;color:#1c1917;line-height:1.4;}
+    .ev-dato.span-2{grid-column:span 2;}
+    .ev-detalle-box{background:#fff;border:1px solid #fed7aa;border-left:3px solid #f97316;border-radius:0 4px 4px 0;padding:10px 12px;font-size:13px;color:#292524;line-height:1.6;margin-top:8px;}
+
+    /* Bloque acciones del área */
+    .ev-observacion{font-size:13px;color:var(--ink-soft);line-height:1.6;margin-bottom:8px;background:#fffbeb;padding:12px 14px;border-radius:4px;border-left:3px solid #f59e0b;}
+    .ev-desc{font-size:13px;color:var(--ink-soft);line-height:1.6;margin-bottom:14px;background:#f9fafb;padding:12px 14px;border-radius:4px;border-left:3px solid #16a34a;}
+    .ev-thumbs-wrap{display:flex;flex-wrap:wrap;gap:0;margin-bottom:16px;}
+    .ev-thumb{text-decoration:none;display:inline-block;position:relative;margin:4px;}
+    .ev-thumb-box{position:relative;width:140px;height:110px;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb;background:#f3f4f6;transition:all 0.15s;}
+    .ev-thumb:hover .ev-thumb-box{border-color:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,0.12);}
+    .ev-thumb-box img{width:100%;height:100%;object-fit:cover;display:block;}
+    .ev-thumb-fallback{display:none;position:absolute;inset:0;align-items:center;justify-content:center;background:#f3f4f6;color:#9ca3af;font-size:32px;}
+    .ev-thumb-overlay-video{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);border-radius:4px;}
+    .ev-thumb-play{background:rgba(0,0,0,0.7);color:white;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;padding-left:3px;}
+    .ev-thumb-label{font-size:10px;color:var(--ink-muted);text-align:center;margin-top:5px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}
+    .ev-archivo-link{background:#f0f2f4;border:1px solid var(--border);border-radius:3px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;transition:all 0.15s;display:inline-block;margin:4px;}
+    .ev-archivo-link:hover{background:var(--accent-bg);}
+    .ev-acciones{display:flex;gap:10px;padding-top:14px;border-top:1px solid var(--border);}
+    .btn-aceptar-ev{flex:1;padding:12px;background:#16A34A;color:white;border:none;border-radius:4px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s;}
+    .btn-aceptar-ev:hover{background:#15803d;}
+    .btn-aceptar-ev:disabled{background:#d1d5db;cursor:not-allowed;}
+    .btn-rechazar-ev{flex:1;padding:12px;background:white;color:#CE000C;border:1.5px solid #CE000C;border-radius:4px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;}
+    .btn-rechazar-ev:hover{background:#fff5f5;}
+    .ev-empty{text-align:center;padding:60px 20px;color:var(--ink-muted);font-size:14px;background:white;border-radius:var(--radius);border:1px solid var(--border);}
+
+    /* Modal rechazo */
+    #modal-rechazo{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+    #modal-rechazo.show{display:flex;}
+    .modal-rechazo-box{background:white;border-radius:8px;padding:24px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+    .modal-rechazo-titulo{font-size:17px;font-weight:700;color:#CE000C;margin-bottom:6px;}
+    .modal-rechazo-sub{font-size:13px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5;}
+    .modal-rechazo-box label{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;}
+    .modal-rechazo-box textarea{width:100%;border:1.5px solid #d1d5db;border-radius:4px;padding:10px 12px;font-size:13px;font-family:'Montserrat',sans-serif;resize:vertical;min-height:100px;outline:none;box-sizing:border-box;line-height:1.5;}
+    .modal-rechazo-box textarea:focus{border-color:#CE000C;}
+    .modal-rechazo-acciones{display:flex;gap:10px;margin-top:16px;}
+    .btn-modal-cancelar{flex:1;padding:11px;border:1px solid #d1d5db;border-radius:4px;background:white;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-soft);}
+    .btn-modal-cancelar:hover{background:#f5f7fa;}
+    .btn-modal-confirmar-rechazo{flex:1;padding:11px;border:none;border-radius:4px;background:#CE000C;color:white;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+    .btn-modal-confirmar-rechazo:hover{background:#a50009;}
+
+    /* KPI */
+    #vista-kpi{padding:28px;max-width:1100px;margin:0 auto;display:none;}
+    .kpi-filtros{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+    .kpi-filtros select,.kpi-filtros input{border:1px solid #d1d5db;border-radius:3px;padding:8px 12px;font-size:13px;font-family:'Montserrat',sans-serif;outline:none;background:white;}
+    .kpi-filtros select:focus,.kpi-filtros input:focus{border-color:#CE000C;}
+    .btn-kpi-buscar{background:#CE000C;color:white;border:none;border-radius:3px;padding:8px 20px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+    .btn-kpi-buscar:hover{background:#a50009;}
+    .kpi-empty{text-align:center;padding:48px;color:var(--ink-muted);font-size:14px;}
+
+    /* Anular */
+    .btn-anular{width:100%;padding:14px;background:white;color:#c0392b;border:2px solid #c0392b;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:10px;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .btn-anular:hover{background:#fff0ee;}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+    .modal-box{background:white;border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
+    .modal-titulo{font-size:18px;font-weight:700;color:#c0392b;margin-bottom:6px;}
+    .modal-sub{font-size:13px;color:var(--ink-muted);margin-bottom:20px;}
+    .modal-box label{font-size:12px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;}
+    .modal-box textarea{width:100%;border:1.5px solid #dde3ea;border-radius:8px;padding:10px 12px;font-size:14px;font-family:'Montserrat',sans-serif;resize:none;min-height:100px;box-sizing:border-box;outline:none;transition:border-color 0.15s;}
+    .modal-box textarea:focus{border-color:#c0392b;}
+    .modal-acciones{display:flex;gap:10px;margin-top:16px;}
+    .modal-btn-cancelar{flex:1;padding:11px;border:1.5px solid #dde3ea;border-radius:8px;background:white;color:var(--ink);font-size:14px;font-weight:600;cursor:pointer;}
+    .modal-btn-cancelar:hover{background:#f5f7fa;}
+    .modal-btn-confirmar{flex:1;padding:11px;border:none;border-radius:8px;background:#c0392b;color:white;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+    .modal-btn-confirmar:hover{background:#a93226;}
+    .modal-btn-confirmar:disabled{opacity:0.6;cursor:not-allowed;}
+    #vista-anulado{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center;padding:40px;gap:14px;}
+    .anulado-icon{font-size:56px;margin-bottom:12px;}
+    .anulado-titulo{font-size:24px;font-weight:700;color:#c0392b;margin-bottom:8px;}
+    .anulado-sub{font-size:15px;color:var(--ink-muted);max-width:360px;line-height:1.6;text-align:center;}
+    #vista-cargando{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:16px;color:var(--ink-muted);font-size:14px;}
+    .loader{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+    @media(max-width:900px){
+      .panel-grid{grid-template-columns:1fr;}
+      .card-trabajador{position:static;}
+      .tabla-header{display:none;}
+      .tabla-fila{grid-template-columns:1fr;gap:4px;}
+      .insp-grid{grid-template-columns:1fr;}
+      .field.span-2{grid-column:span 1;}
+      .insp-grid.cols-3{grid-template-columns:1fr;}
+      .ev-desviacion-grid{grid-template-columns:1fr;}
+      .ev-dato.span-2{grid-column:span 1;}
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" fill="#CE000C" rx="3"/><text x="14" y="20" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-size="19" fill="white">P</text></svg>
+        <span style="font-family:Montserrat,sans-serif;font-weight:800;font-size:15px;color:white;letter-spacing:0.5px;">CEMENTOS PACASMAYO</span>
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-subtitle">Panel de Inspector · SMA</div>
+    </div>
+    <div class="topbar-right"><div class="badge-inspector">🔒 Inspector SMA</div></div>
+  </div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-bandeja" onclick="cambiarVistaPrincipal('bandeja')">📋 Bandeja de Entrada</button>
+    <button class="nav-tab" onclick="cambiarVistaPrincipal('evidencias')" id="tab-evidencias">
+      📎 Evidencias <span id="badge-ev" style="display:none;background:#CE000C;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">0</span>
+    </button>
+    <button class="nav-tab" id="tab-kpi" onclick="cambiarVistaPrincipal('kpi')">📊 KPI Levantamiento</button>
+  </div>
+
+  <div id="vista-cargando"><div class="loader"></div><span>Cargando bandeja de entrada...</span></div>
+
+  <div id="vista-bandeja" style="display:none;">
+    <div class="page-title">Bandeja de Entrada</div>
+    <div class="page-sub">Reportes enviados por trabajadores · Pendientes de validación</div>
+    <div class="filtros">
+      <button class="filtro-btn active" data-filtro="todos">Todos</button>
+      <button class="filtro-btn" data-filtro="PENDIENTE">⏳ Pendientes</button>
+      <button class="filtro-btn" data-filtro="ATENDIDO">✅ Atendidos</button>
+    </div>
+    <div class="tabla-wrap">
+      <div class="tabla-header">
+        <div>Código</div><div>Trabajador · Área</div><div>Descripción</div>
+        <div>Fecha Evento</div><div>Estado</div><div>Acción</div>
+      </div>
+      <div id="tabla-body"></div>
+    </div>
+  </div>
+
+  <div id="vista-validacion" style="display:none;">
+    <div class="panel-nav">
+      <button class="btn-back" id="btnBack">← Bandeja</button>
+      <div class="panel-titulo">Validar Reporte</div>
+      <div class="panel-codigo" id="panelCodigo">REF: —</div>
+    </div>
+    <div class="panel-grid">
+      <div class="card-trabajador">
+        <div class="card-trabajador-header"><div class="dot-live"></div><h3>Datos del Trabajador</h3></div>
+        <div class="card-trabajador-body">
+          <div class="dato-item"><div class="dato-label">Nombres</div><div class="dato-value" id="d-nombre">—</div></div>
+          <div class="dato-item"><div class="dato-label">Apellidos</div><div class="dato-value" id="d-apellidos">—</div></div>
+          <div class="dato-item">
+            <div class="dato-label">📞 Celular de contacto</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <div class="dato-value mono" id="d-celular" style="background:var(--warn-bg);border:1px solid var(--warn);border-radius:6px;padding:6px 12px;color:#8a5f00;font-size:15px;font-weight:600;">—</div>
+              <a id="d-celular-wa" href="#" target="_blank" style="display:none;background:#25d366;color:white;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600;text-decoration:none;">WhatsApp →</a>
+            </div>
+          </div>
+          <div class="dato-item"><div class="dato-label">Empresa</div><div class="dato-value" id="d-empresa">—</div></div>
+          <div class="dato-item" id="d-correo-item" style="display:none;"><div class="dato-label">Correo</div><div class="dato-value mono" id="d-correo">—</div></div>
+          <div class="dato-item"><div class="dato-label">Fecha del evento</div><div class="dato-value mono" id="d-fecha">—</div></div>
+          <div class="dato-item"><div class="dato-label">Lugar</div><div class="dato-value" id="d-lugar">—</div></div>
+          <div class="dato-item"><div class="dato-label">Fecha de reporte</div><div class="dato-value mono" id="d-fechaReporte">—</div></div>
+          <div class="dato-item"><div class="dato-label">Descripción <span style="font-size:10px;color:var(--warn);font-weight:600;">(original)</span></div><div class="dato-desc" id="d-descripcion">—</div></div>
+          <div class="dato-item" id="d-propuesta-item" style="display:none;"><div class="dato-label">💡 Propuesta del trabajador</div><div class="dato-desc" id="d-propuesta" style="border-left-color:#1a7f4b;background:var(--ok-bg);color:var(--ok);">—</div></div>
+          <div class="dato-item"><div class="dato-label">Evidencia fotográfica</div><div id="d-imagen">—</div></div>
+        </div>
+      </div>
+      <div class="card-inspector">
+        <div class="card-inspector-header"><h3>Completar y Validar</h3><p>Completa los campos técnicos para registrar en Acumulado</p></div>
+        <div class="card-inspector-body">
+          <form id="formInspector">
+            <div class="insp-section">
+              <div class="insp-section-title">Descripción del Evento</div>
+              <div class="insp-grid cols-1">
+                <div class="field"><label>Descripción <span style="font-size:10px;color:var(--ink-muted);font-weight:400;text-transform:none;letter-spacing:0;">(pre-cargada · editable)</span></label><textarea name="detalle" id="detalle" rows="4" placeholder="Descripción del evento..."></textarea></div>
+              </div>
+            </div>
+            <div class="insp-section">
+              <div class="insp-section-title">Clasificación del Evento</div>
+              <div class="insp-grid">
+                <div class="field" id="f-aspecto"><label>Aspecto</label><select name="aspecto" id="aspecto"><option value="">Seleccione</option><option>AMBIENTAL</option><option>SEGURIDAD</option><option>SALUD OCUPACIONAL</option></select></div>
+                <div class="field" id="f-claseEvento"><label>Clase de Evento</label><select name="claseEvento" id="claseEvento"><option value="">Seleccione</option><option>DESVIACIÓN</option><option>DAÑO A LA PROPIEDAD</option><option>INCIDENTE</option><option>ACCIDENTE</option><option>INCIDENTE PELIGROSO</option></select></div>
+                <input type="hidden" name="unidad" id="unidad" value="CSSA" />
+                <div class="field" id="f-empresa"><label>Empresa</label><select name="empresa" id="empresa" class="select-buscable"><option value="">Seleccione</option><? for (let i = 0; i < empresas.length; i++) { ?><option value="<?= empresas[i] ?>"><?= empresas[i] ?></option><? } ?></select></div>
+                <div class="field" id="f-tipificacion"><label>Tipificación</label><select name="tipificacion" id="tipificacion" class="select-buscable"><option value="">Seleccione</option><? for (let i = 0; i < tipificaciones.length; i++) { ?><option value="<?= tipificaciones[i] ?>"><?= tipificaciones[i] ?></option><? } ?></select></div>
+                <div class="field span-2"><label>Desglose 1</label><textarea name="desglose1" id="desglose1" placeholder="Desglose del evento..."></textarea></div>
+                <div class="field span-2"><label>Acto / Condición</label><select name="actoCondicion" id="actoCondicion"><option value="">Seleccione</option><option>ACTO</option><option>CONDICIÓN</option></select></div>
+              </div>
+            </div>
+            <div class="insp-section">
+              <div class="insp-section-title">Evaluación de Riesgo</div>
+              <div class="insp-grid cols-3">
+                <div class="field" id="f-probabilidad"><label>Probabilidad (1-5)</label><input type="number" name="probabilidad" id="probabilidad" min="1" max="5" placeholder="1 – 5" /></div>
+                <div class="field" id="f-severidadTexto"><label>Severidad (1-5)</label><input type="number" name="severidadTexto" id="severidadTexto" min="1" max="5" placeholder="1 – 5" /></div>
+                <div class="field"><label>Riesgo (P × S)</label><div class="riesgo-display" id="riesgoDisplay">—</div></div>
+                <div class="field span-2" id="f-criticidad"><label>Criticidad</label><select name="criticidad" id="criticidad"><option value="">Seleccione</option><option>Moderado</option><option>Importante</option><option>No tolerable</option></select></div>
+                <div class="field" id="f-diasPerdidos"><label>Días perdidos</label><input type="number" name="diasPerdidos" id="diasPerdidos" min="0" placeholder="0" /></div>
+              </div>
+            </div>
+            <div class="insp-section">
+              <div class="insp-section-title">Personal Involucrado</div>
+              <div class="insp-grid">
+                <div class="field"><label>Nombre relacionado 1</label><input type="text" name="nombreRelacion1" id="nombreRelacion1" placeholder="Nombre completo" /></div>
+                <div class="field"><label>Nombre relacionado 2</label><input type="text" name="nombreRelacion2" id="nombreRelacion2" placeholder="Nombre completo" /></div>
+              </div>
+            </div>
+            <div class="insp-section">
+              <div class="insp-section-title">Causas y Acciones</div>
+              <div class="insp-grid cols-1">
+                <div class="field" id="f-accionCorrectiva"><label>Acción Correctiva Inmediata</label><textarea name="accionCorrectiva" id="accionCorrectiva" placeholder="Acción correctiva a tomar..."></textarea></div>
+                <div class="field" id="f-accionPreventiva"><label>Acción Preventiva Permanente</label><textarea name="accionPreventiva" id="accionPreventiva" placeholder="Acción preventiva a implementar..."></textarea></div>
+              </div>
+            </div>
+            <div class="insp-section">
+              <div class="insp-section-title">Responsable y Fecha Límite</div>
+              <div class="insp-grid">
+                <div class="field span-2" id="f-responsable"><label>Responsable</label><select name="responsable" id="responsable" class="select-buscable"><option value="">— Escribe para buscar —</option><? for (let i = 0; i < responsables.length; i++) { ?><option value="<?= responsables[i] ?>"><?= responsables[i] ?></option><? } ?></select></div>
+                <div class="field" id="f-fechaLimite"><label>Fecha Límite</label><input type="date" name="fechaLimite" id="fechaLimite" /></div>
+                <div class="field" id="f-status"><label>Status inicial</label><select name="status" id="status"><option value="">Seleccione</option><option>En plazo</option><option>Pendiente</option><option>Ejecutado</option></select></div>
+              </div>
+            </div>
+            <div class="insp-section">
+              <div class="insp-section-title">Datos del Reportante</div>
+              <div style="font-size:12px;color:var(--ink-muted);margin:-8px 0 12px;">Pre-cargados del trabajador · editables si es necesario</div>
+              <div class="insp-grid">
+                <div class="field span-2"><label>¿Quién realizó el reporte?</label><select name="quienReporta" id="quienReporta" class="select-buscable"><option value="">— Escribe para buscar —</option><? for (let i = 0; i < quienReportaOpts.length; i++) { ?><option value="<?= quienReportaOpts[i] ?>"><?= quienReportaOpts[i] ?></option><? } ?></select></div>
+                <div class="field span-2"><label>Nombre de quien realiza el reporte</label><select name="nombreReportante" id="nombreReportante" class="select-buscable"><option value="">— Escribe para buscar —</option><? for (let i = 0; i < nombresPersonal.length; i++) { ?><option value="<?= nombresPersonal[i] ?>"><?= nombresPersonal[i] ?></option><? } ?></select></div>
+                <div class="field span-2"><label>Área del reportante</label><select name="areaReportante" id="areaReportante" class="select-buscable"><option value="">— Escribe para buscar —</option><? for (let i = 0; i < subAreas.length; i++) { ?><option value="<?= subAreas[i] ?>"><?= subAreas[i] ?></option><? } ?></select></div>
+              </div>
+            </div>
+            <button type="submit" class="btn-validar" id="btnValidar"><span id="btnValidarText">✅ Registrar en Acumulado</span><div class="spinner" id="spinnerVal"></div></button>
+            <button type="button" class="btn-anular" id="btnAnular">🚫 Anular Reporte</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="vista-exito" style="display:none;">
+    <div class="exito-icon">🎯</div>
+    <div class="exito-titulo">Reporte Validado</div>
+    <div class="exito-sub">El registro fue transferido correctamente a la hoja Acumulado.</div>
+    <div class="exito-codigo" id="exitoCodigo">—</div>
+    <button class="btn-volver-bandeja" id="btnVolverBandeja">← Volver a Bandeja</button>
+  </div>
+
+  <div id="vista-evidencias">
+    <div class="page-title" style="margin-bottom:4px;">Evidencias de Levantamiento</div>
+    <div class="page-sub" style="margin-bottom:20px;">Verificar y aceptar evidencias enviadas por las áreas</div>
+    <div id="ev-contenido"><div class="ev-empty">⏳ Cargando evidencias...</div></div>
+  </div>
+
+  <div id="vista-kpi">
+    <div class="page-title" style="margin-bottom:4px;">KPI — Levantamiento de Desviaciones</div>
+    <div class="page-sub" style="margin-bottom:20px;">Desviaciones ejecutadas por área y período</div>
+    <div class="kpi-filtros">
+      <select id="kpi-anio"><option value="">Todos los años</option><option value="2026" selected>2026</option><option value="2025">2025</option></select>
+      <select id="kpi-mes"><option value="">Todos los meses</option><option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select>
+      <button class="btn-kpi-buscar" onclick="cargarKpi()">🔍 Consultar</button>
+    </div>
+    <div id="kpi-contenido"><div class="kpi-empty">Selecciona un período y haz clic en Consultar</div></div>
+  </div>
+
+  <div id="vista-anulado" style="display:none;">
+    <div class="anulado-icon">🚫</div><div class="anulado-titulo">Reporte Anulado</div>
+    <div class="anulado-sub">El reporte fue eliminado de la Bandeja de Entrada.</div>
+    <button class="btn-volver-bandeja" id="btnVolverBandejaAnulado" style="margin-top:24px;">← Volver a Bandeja</button>
+  </div>
+
+  <div id="modal-rechazo">
+    <div class="modal-rechazo-box">
+      <div class="modal-rechazo-titulo">🚫 Rechazar Evidencia</div>
+      <div class="modal-rechazo-sub">El responsable recibirá un correo con el motivo y deberá subir nueva evidencia.</div>
+      <label>Motivo del rechazo *</label>
+      <textarea id="motivo-rechazo" placeholder="Ej: La foto no corresponde a la desviación..."></textarea>
+      <div class="modal-rechazo-acciones">
+        <button class="btn-modal-cancelar" onclick="cerrarModalRechazo()">Cancelar</button>
+        <button class="btn-modal-confirmar-rechazo" onclick="confirmarRechazo()">Confirmar rechazo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalAnular" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-titulo">🚫 Anular Reporte</div>
+      <div class="modal-sub">El reporte será eliminado. Si el trabajador dejó correo, recibirá notificación.</div>
+      <label>Motivo de anulación *</label>
+      <textarea id="motivoAnulacion" placeholder="Ej: Datos incompletos, reporte duplicado..."></textarea>
+      <div class="modal-acciones">
+        <button class="modal-btn-cancelar" id="btnCancelarAnular">Cancelar</button>
+        <button class="modal-btn-confirmar" id="btnConfirmarAnular">
+          <span id="btnAnularText">Confirmar anulación</span>
+          <div class="spinner" id="spinnerAnular" style="display:none;border:2px solid rgba(255,255,255,0.3);border-top-color:white;width:16px;height:16px;border-radius:50%;animation:spin 0.7s linear infinite;"></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    var base64FotoInspector = "";
+    var reportes            = [];
+    var reporteActivo       = null;
+    var filtroActivo        = "todos";
+    var evidenciasCache     = [];
+    var evRechazoFilaLev    = null;
+    var evRechazoCodigo     = null;
+
+    function showToast(msg, tipo) {
+      tipo = tipo || "ok";
+      var t = document.getElementById("toast");
+      t.textContent = msg;
+      t.className = "toast " + tipo;
+      t.classList.add("show");
+      setTimeout(function(){ t.classList.remove("show"); }, 3500);
+    }
+
+    function ocultarTodo() {
+      var ids = ["vista-cargando","vista-bandeja","vista-validacion","vista-exito","vista-anulado","vista-evidencias","vista-kpi"];
+      for (var i = 0; i < ids.length; i++) {
+        document.getElementById(ids[i]).style.display = "none";
+      }
+    }
+
+    function cambiarVistaPrincipal(vista) {
+      document.querySelectorAll(".nav-tab").forEach(function(t){ t.classList.remove("active"); });
+      ocultarTodo();
+      if (vista === "bandeja") {
+        document.getElementById("tab-bandeja").classList.add("active");
+        document.getElementById("vista-bandeja").style.display = "block";
+        renderTabla(filtroActivo);
+      } else if (vista === "evidencias") {
+        document.getElementById("tab-evidencias").classList.add("active");
+        document.getElementById("vista-evidencias").style.display = "block";
+        cargarEvidencias();
+      } else if (vista === "kpi") {
+        document.getElementById("tab-kpi").classList.add("active");
+        document.getElementById("vista-kpi").style.display = "block";
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function cargarBandeja() {
+      ocultarTodo();
+      document.getElementById("vista-cargando").style.display = "flex";
+      google.script.run
+        .withSuccessHandler(function(data) {
+          reportes = data || [];
+          ocultarTodo();
+          document.getElementById("vista-bandeja").style.display = "block";
+          document.getElementById("tab-bandeja").classList.add("active");
+          renderTabla(filtroActivo);
+        })
+        .withFailureHandler(function(e) {
+          ocultarTodo();
+          document.getElementById("vista-bandeja").style.display = "block";
+          showToast("Error al cargar: " + e.message, "error");
+        })
+        .obtenerReportesBandeja();
+    }
+
+    function cargarBandejaBackground() {
+      google.script.run
+        .withSuccessHandler(function(data){ reportes = data || []; })
+        .obtenerReportesBandeja();
+    }
+
+    function renderTabla(filtro) {
+      var tbody = document.getElementById("tabla-body");
+      var lista = filtro === "todos" ? reportes : reportes.filter(function(r){ return r.estado === filtro; });
+      if (lista.length === 0) {
+        tbody.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No hay reportes</div></div>';
+        return;
+      }
+      var html = "";
+      for (var i = 0; i < lista.length; i++) {
+        var r = lista[i];
+        var cls = r.estado === "PENDIENTE" ? "pendiente" : "atendido";
+        var badge = r.estado === "PENDIENTE"
+          ? '<span class="estado-badge pendiente">⏳ Pendiente</span>'
+          : '<span class="estado-badge atendido">✅ Atendido</span>';
+        var btn = r.estado === "PENDIENTE"
+          ? '<button class="btn-atender" onclick="abrirValidacion(' + r.id + ')">Atender →</button>'
+          : '<button class="btn-ver" onclick="abrirValidacion(' + r.id + ')">Ver</button>';
+        html += '<div class="tabla-fila ' + cls + '" data-id="' + r.id + '">';
+        html += '<div class="col-codigo">' + (r.codigoRef || "—") + '</div>';
+        html += '<div><div class="col-trabajador">' + (r.nombre || "—") + '</div><div class="col-area">' + (r.empresa || "—") + '</div></div>';
+        html += '<div class="col-desc">' + (r.descripcion || "—") + '</div>';
+        html += '<div class="col-fecha">' + (r.fechaEvento || "—") + '</div>';
+        html += '<div>' + badge + '</div><div>' + btn + '</div></div>';
+      }
+      tbody.innerHTML = html;
+    }
+
+    function abrirValidacion(id) {
+      reporteActivo = null;
+      for (var i = 0; i < reportes.length; i++) {
+        if (String(reportes[i].id) === String(id)) { reporteActivo = reportes[i]; break; }
+      }
+      if (!reporteActivo) { showToast("No se encontró el reporte", "error"); return; }
+      ocultarTodo();
+      document.getElementById("vista-validacion").style.display = "block";
+      document.getElementById("d-nombre").textContent       = reporteActivo.nombre      || "—";
+      document.getElementById("d-apellidos").textContent    = reporteActivo.apellidos   || "—";
+      var cel = String(reporteActivo.celular || "");
+      document.getElementById("d-celular").textContent = cel || "—";
+      var waBtn = document.getElementById("d-celular-wa");
+      if (cel) { waBtn.href = "https://wa.me/51" + cel.replace(/\s/g,"").replace(/^\+51/,""); waBtn.style.display = "inline-block"; }
+      else { waBtn.style.display = "none"; }
+      document.getElementById("d-empresa").textContent      = reporteActivo.empresa     || "—";
+      if (reporteActivo.correo) { document.getElementById("d-correo").textContent = reporteActivo.correo; document.getElementById("d-correo-item").style.display = "block"; }
+      else { document.getElementById("d-correo-item").style.display = "none"; }
+      document.getElementById("d-fecha").textContent        = reporteActivo.fechaEvento || "—";
+      document.getElementById("d-lugar").textContent        = reporteActivo.lugar       || "—";
+      document.getElementById("d-fechaReporte").textContent = reporteActivo.fechaReporte|| "—";
+      document.getElementById("d-descripcion").textContent  = reporteActivo.descripcion || "—";
+      if (reporteActivo.propuesta) { document.getElementById("d-propuesta").textContent = reporteActivo.propuesta; document.getElementById("d-propuesta-item").style.display = "block"; }
+      else { document.getElementById("d-propuesta-item").style.display = "none"; }
+      document.getElementById("panelCodigo").textContent    = reporteActivo.codigoRef   || "—";
+      base64FotoInspector = "";
+      var imgEl   = document.getElementById("d-imagen");
+      var urlsRaw = String(reporteActivo.imgUrl || "").trim();
+      var listaUrls = urlsRaw.split("|").map(function(u){ return u.trim(); }).filter(function(u){ return u.length > 10; });
+      if (listaUrls.length > 0) {
+        var imgHtml = "";
+        for (var j = 0; j < listaUrls.length; j++) {
+          var url = listaUrls[j];
+          var esVid = /\.(mp4|mov|avi)/i.test(url);
+          var icono = esVid ? "🎬" : "📷";
+          var etiq  = esVid ? "Ver video" : "Ver imagen";
+          var num   = listaUrls.length > 1 ? " " + (j + 1) : "";
+          imgHtml += '<a href="' + url + '" target="_blank" class="btn-ver-img" style="margin-right:6px;margin-bottom:6px;display:inline-flex;">' + icono + ' ' + etiq + num + ' →</a>';
+        }
+        imgEl.innerHTML = imgHtml;
+      } else {
+        imgEl.innerHTML = '<div id="foto-inspector-wrap"><label style="cursor:pointer;display:inline-block;"><input type="file" id="fotoInspectorInput" accept="image/*" style="display:none;" /><span class="btn-adjuntar-foto">📎 Adjuntar foto</span></label><div id="foto-inspector-preview" style="display:none;margin-top:8px;"><img id="foto-inspector-img" src="" style="max-width:100%;border-radius:4px;border:1px solid #e5e7eb;" /><button type="button" id="foto-inspector-remove" style="margin-top:4px;background:none;border:none;color:#CE000C;font-size:12px;cursor:pointer;font-weight:600;">✕ Quitar foto</button></div></div>';
+        setTimeout(function(){
+          var inp = document.getElementById("fotoInspectorInput");
+          if (inp) inp.addEventListener("change", function(e){
+            var file = e.target.files[0]; if (!file) return;
+            comprimirImagenInspector(file, function(b64){ base64FotoInspector = b64; document.getElementById("foto-inspector-img").src = b64; document.getElementById("foto-inspector-preview").style.display = "block"; });
+          });
+          var btnR = document.getElementById("foto-inspector-remove");
+          if (btnR) btnR.addEventListener("click", function(){ base64FotoInspector = ""; document.getElementById("fotoInspectorInput").value = ""; document.getElementById("foto-inspector-preview").style.display = "none"; document.getElementById("foto-inspector-img").src = ""; });
+        }, 100);
+      }
+      try { document.getElementById("formInspector").reset(); } catch(e){}
+      document.getElementById("detalle").value = reporteActivo.descripcion || "";
+      calcularRiesgo();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function comprimirImagenInspector(file, callback) {
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var img = new Image();
+        img.onload = function() {
+          var MAX = 1280, w = img.width, h = img.height;
+          if (w > MAX || h > MAX) { if (w > h) { h = Math.round(h*MAX/w); w = MAX; } else { w = Math.round(w*MAX/h); h = MAX; } }
+          var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          callback(canvas.toDataURL("image/jpeg", 0.75));
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function calcularRiesgo() {
+      var p = parseInt(document.getElementById("probabilidad").value) || 0;
+      var s = parseInt(document.getElementById("severidadTexto").value) || 0;
+      var display = document.getElementById("riesgoDisplay");
+      if (!p || !s) { display.textContent = "—"; display.className = "riesgo-display"; return; }
+      var r = p * s; display.textContent = r;
+      if (r <= 8) display.className = "riesgo-display bajo";
+      else if (r <= 15) display.className = "riesgo-display medio";
+      else display.className = "riesgo-display alto";
+    }
+    document.getElementById("probabilidad").addEventListener("input", calcularRiesgo);
+    document.getElementById("severidadTexto").addEventListener("input", calcularRiesgo);
+
+    document.getElementById("formInspector").addEventListener("submit", function(e) {
+      e.preventDefault();
+      var btn = document.getElementById("btnValidar"); var btnText = document.getElementById("btnValidarText"); var spinner = document.getElementById("spinnerVal");
+      btn.disabled = true; btnText.textContent = "Registrando..."; spinner.style.display = "block";
+      var datosInspector = {
+        aspecto: document.getElementById("aspecto").value, claseEvento: document.getElementById("claseEvento").value,
+        unidad: document.getElementById("unidad").value, empresa: document.getElementById("empresa").value,
+        tipificacion: document.getElementById("tipificacion").value, desglose1: document.getElementById("desglose1").value.trim(),
+        actoCondicion: document.getElementById("actoCondicion").value, probabilidad: document.getElementById("probabilidad").value,
+        severidadTexto: document.getElementById("severidadTexto").value, criticidad: document.getElementById("criticidad").value,
+        diasPerdidos: document.getElementById("diasPerdidos").value, nombreRelacion1: document.getElementById("nombreRelacion1").value.trim(),
+        nombreRelacion2: document.getElementById("nombreRelacion2").value.trim(), accionCorrectiva: document.getElementById("accionCorrectiva").value.trim(),
+        accionPreventiva: document.getElementById("accionPreventiva").value.trim(), responsable: document.getElementById("responsable").value,
+        fechaLimite: document.getElementById("fechaLimite").value, status: document.getElementById("status").value,
+        fecha: reporteActivo.fechaEvento, lugar: reporteActivo.lugar, detalle: document.getElementById("detalle").value.trim(),
+        quienReporta: document.getElementById("quienReporta").value, nombreReportante: document.getElementById("nombreReportante").value.trim(),
+        areaReportante: document.getElementById("areaReportante").value.trim(), desglose2: ""
+      };
+      google.script.run
+        .withSuccessHandler(function(codigo) {
+          document.getElementById("exitoCodigo").textContent = codigo;
+          ocultarTodo(); document.getElementById("vista-exito").style.display = "flex";
+          cargarBandejaBackground();
+        })
+        .withFailureHandler(function(err) {
+          showToast("Error: " + err.message, "error");
+          btn.disabled = false; btnText.textContent = "✅ Registrar en Acumulado"; spinner.style.display = "none";
+        })
+        .validarYPasarAcumulado(reporteActivo.id, reporteActivo.codigoRef, datosInspector, base64FotoInspector);
+    });
+
+    document.querySelectorAll(".filtro-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        document.querySelectorAll(".filtro-btn").forEach(function(b){ b.classList.remove("active"); });
+        this.classList.add("active"); filtroActivo = this.dataset.filtro; renderTabla(filtroActivo);
+      });
+    });
+
+    document.getElementById("btnBack").addEventListener("click", function(){ cambiarVistaPrincipal("bandeja"); });
+    document.getElementById("btnVolverBandeja").addEventListener("click", function(){
+      document.getElementById("formInspector").reset(); $(".select-buscable").val("").trigger("change");
+      base64FotoInspector = ""; document.getElementById("btnValidar").disabled = false;
+      document.getElementById("btnValidarText").textContent = "✅ Registrar en Acumulado";
+      document.getElementById("spinnerVal").style.display = "none"; reporteActivo = null;
+      cambiarVistaPrincipal("bandeja");
+    });
+    document.getElementById("btnVolverBandejaAnulado").addEventListener("click", function(){ reporteActivo = null; cambiarVistaPrincipal("bandeja"); });
+    document.getElementById("btnAnular").addEventListener("click", function(){ document.getElementById("motivoAnulacion").value = ""; document.getElementById("modalAnular").style.display = "flex"; });
+    document.getElementById("btnCancelarAnular").addEventListener("click", function(){ document.getElementById("modalAnular").style.display = "none"; });
+    document.getElementById("btnConfirmarAnular").addEventListener("click", function(){
+      var motivo = document.getElementById("motivoAnulacion").value.trim();
+      if (!motivo) { document.getElementById("motivoAnulacion").style.borderColor = "#c0392b"; return; }
+      document.getElementById("motivoAnulacion").style.borderColor = "";
+      var btnConf = document.getElementById("btnConfirmarAnular"); var btnText = document.getElementById("btnAnularText"); var spinner = document.getElementById("spinnerAnular");
+      btnConf.disabled = true; btnText.textContent = "Anulando..."; spinner.style.display = "block";
+      google.script.run
+        .withSuccessHandler(function(){
+          document.getElementById("modalAnular").style.display = "none";
+          document.getElementById("btnValidar").disabled = false;
+          document.getElementById("btnValidarText").textContent = "✅ Registrar en Acumulado";
+          document.getElementById("spinnerVal").style.display = "none";
+          ocultarTodo(); document.getElementById("vista-anulado").style.display = "flex"; cargarBandejaBackground();
+        })
+        .withFailureHandler(function(err){
+          showToast("Error al anular: " + err.message, "error");
+          btnConf.disabled = false; btnText.textContent = "Confirmar anulación"; spinner.style.display = "none";
+        })
+        .anularReporte(reporteActivo.id, reporteActivo.correo, reporteActivo.nombre, motivo);
+    });
+
+    // ══════════════════════════════════════════════════
+    // EVIDENCIAS
+    // ══════════════════════════════════════════════════
+    function cargarEvidencias() {
+      var cont = document.getElementById("ev-contenido");
+      cont.innerHTML = '<div class="ev-empty">⏳ Cargando evidencias pendientes...</div>';
+      google.script.run
+        .withSuccessHandler(function(lista){
+          evidenciasCache = lista || [];
+          renderEvidencias(evidenciasCache);
+          actualizarBadgeEvidencias(evidenciasCache.length);
+        })
+        .withFailureHandler(function(err){
+          cont.innerHTML = '<div class="ev-empty" style="color:#CE000C;">❌ Error al cargar: ' + err.message + '</div>';
+        })
+        .obtenerLevantamientosPendientes();
+    }
+
+    function actualizarBadgeEvidencias(n) {
+      var badge = document.getElementById("badge-ev");
+      if (n > 0) { badge.textContent = n; badge.style.display = "inline-block"; }
+      else { badge.style.display = "none"; }
+    }
+
+    function esVideo(url) { var u = (url || "").toLowerCase(); return u.includes(".mp4") || u.includes(".mov") || u.includes(".avi") || u.includes(".webm"); }
+
+    function extraerFileIdDrive(url) {
+      if (!url) return null;
+      var m = url.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})/); if (m) return m[1];
+      m = url.match(/[?&]id=([a-zA-Z0-9_-]{20,})/); if (m) return m[1];
+      m = url.match(/([a-zA-Z0-9_-]{25,})/); return m ? m[1] : null;
+    }
+
+    function buildThumbHtml(url, idx) {
+      var fileId = extraerFileIdDrive(url); var esVid = esVideo(url);
+      if (!fileId) return '<a href="' + url + '" target="_blank" class="ev-archivo-link">📎 Archivo ' + (idx + 1) + ' →</a>';
+      var thumbUrl = "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w300";
+      var overlay  = esVid ? '<div class="ev-thumb-overlay-video"><div class="ev-thumb-play">▶</div></div>' : "";
+      var tipoLabel = esVid ? "🎬 Video" : "🖼️ Foto"; var fallbackIcon = esVid ? "🎬" : "🖼️";
+      return '<a href="' + url + '" target="_blank" class="ev-thumb">'
+        + '<div class="ev-thumb-box"><img src="' + thumbUrl + '" alt="evidencia ' + (idx+1) + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';" />'
+        + '<div class="ev-thumb-fallback">' + fallbackIcon + '</div>' + overlay + '</div>'
+        + '<div class="ev-thumb-label">' + tipoLabel + ' ' + (idx + 1) + '</div></a>';
+    }
+
+    // ── Render evidencias con bloque de desviación original completo ──
+    function renderEvidencias(lista) {
+      var cont = document.getElementById("ev-contenido");
+      if (!lista || lista.length === 0) {
+        cont.innerHTML = '<div class="ev-empty"><div style="font-size:48px;margin-bottom:12px;">✅</div><div style="font-weight:600;color:var(--ink-soft);margin-bottom:4px;">Todo al día</div><div>No hay evidencias pendientes de validación</div></div>';
+        return;
+      }
+      var html = "";
+      for (var i = 0; i < lista.length; i++) {
+        var ev = lista[i];
+
+        // Thumbnails
+        var thumbsHtml = "";
+        for (var j = 0; j < ev.urls.length; j++) thumbsHtml += buildThumbHtml(ev.urls[j], j);
+
+        // Bloque desviación original — se construye si hay datos
+        var bloqueOriginal = "";
+        if (ev.detalleObservacion || ev.responsable || ev.area || ev.fechaLimite || ev.criticidad) {
+          bloqueOriginal += '<div class="ev-desviacion-original">';
+          bloqueOriginal += '<div class="ev-desviacion-original-title">🔍 Desviación Original — ' + ev.codigo + '</div>';
+          bloqueOriginal += '<div class="ev-desviacion-grid">';
+
+          if (ev.area) {
+            bloqueOriginal += '<div class="ev-dato"><div class="ev-dato-label">Área</div><div class="ev-dato-valor">' + ev.area + '</div></div>';
+          }
+          if (ev.responsable) {
+            bloqueOriginal += '<div class="ev-dato"><div class="ev-dato-label">Responsable</div><div class="ev-dato-valor">' + ev.responsable + '</div></div>';
+          }
+          if (ev.aspecto) {
+            bloqueOriginal += '<div class="ev-dato"><div class="ev-dato-label">Aspecto</div><div class="ev-dato-valor">' + ev.aspecto + '</div></div>';
+          }
+          if (ev.clase) {
+            bloqueOriginal += '<div class="ev-dato"><div class="ev-dato-label">Clase</div><div class="ev-dato-valor">' + ev.clase + '</div></div>';
+          }
+          if (ev.criticidad) {
+            bloqueOriginal += '<div class="ev-dato"><div class="ev-dato-label">Criticidad</div><div class="ev-dato-valor">' + ev.criticidad + '</div></div>';
+          }
+          if (ev.fechaLimite) {
+            bloqueOriginal += '<div class="ev-dato"><div class="ev-dato-label">Fecha Límite</div><div class="ev-dato-valor">' + ev.fechaLimite + '</div></div>';
+          }
+          if (ev.accionCorrectiva) {
+            bloqueOriginal += '<div class="ev-dato span-2"><div class="ev-dato-label">Acción Correctiva Indicada</div><div class="ev-dato-valor">' + ev.accionCorrectiva + '</div></div>';
+          }
+          bloqueOriginal += '</div>'; // cierra grid
+
+          if (ev.detalleObservacion) {
+            bloqueOriginal += '<div class="ev-dato-label" style="margin-top:10px;color:#9a3412;">Detalle de la Desviación</div>';
+            bloqueOriginal += '<div class="ev-detalle-box">' + ev.detalleObservacion + '</div>';
+          }
+          bloqueOriginal += '</div>'; // cierra ev-desviacion-original
+        }
+
+        // Acciones tomadas por el área
+        var accionesHtml = '<div class="ev-desc"><strong style="color:#16a34a;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">✅ Acciones tomadas por el área:</strong>' + ev.descripcion + '</div>';
+
+        html += '<div class="ev-card" id="ev-card-' + ev.filaLev + '">';
+        html += '<div class="ev-header"><div class="ev-codigo">📋 ' + ev.codigo + '</div><div class="ev-badge-pend">⏳ PENDIENTE</div></div>';
+        html += '<div class="ev-body">';
+        html += '<div class="ev-meta"><strong>👤 ' + ev.nombre + '</strong> &nbsp;·&nbsp; 📅 ' + ev.fechaEnvio + ' &nbsp;·&nbsp; 📎 ' + ev.numArchivos + ' archivo(s)</div>';
+        html += bloqueOriginal;
+        html += accionesHtml;
+        html += '<div class="ev-thumbs-wrap">' + thumbsHtml + '</div>';
+        html += '<div class="ev-acciones">';
+        html += '<button class="btn-aceptar-ev" onclick="aceptarEvidencia(\'' + ev.codigo + '\', ' + ev.filaLev + ')">✅ Aceptar y marcar como Ejecutado</button>';
+        html += '<button class="btn-rechazar-ev" onclick="abrirModalRechazo(\'' + ev.codigo + '\', ' + ev.filaLev + ')">🚫 Rechazar</button>';
+        html += '</div></div></div>';
+      }
+      cont.innerHTML = html;
+    }
+
+    function aceptarEvidencia(codigo, filaLev) {
+      if (!confirm("¿Aceptar la evidencia de " + codigo + "?\n\nLa desviación pasará a estatus EJECUTADO.")) return;
+      var card = document.getElementById("ev-card-" + filaLev);
+      if (card) { card.style.opacity = "0.5"; card.style.pointerEvents = "none"; }
+      google.script.run
+        .withSuccessHandler(function(){
+          showToast("✅ " + codigo + " aceptado · Estatus → Ejecutado", "ok");
+          evidenciasCache = evidenciasCache.filter(function(ev){ return ev.filaLev !== filaLev; });
+          renderEvidencias(evidenciasCache); actualizarBadgeEvidencias(evidenciasCache.length);
+        })
+        .withFailureHandler(function(err){
+          showToast("Error al aceptar: " + err.message, "error");
+          if (card) { card.style.opacity = "1"; card.style.pointerEvents = "auto"; }
+        })
+        .aceptarLevantamiento(codigo, filaLev, "Inspector SMA");
+    }
+
+    function abrirModalRechazo(codigo, filaLev) {
+      evRechazoCodigo = codigo; evRechazoFilaLev = filaLev;
+      document.getElementById("motivo-rechazo").value = "";
+      document.getElementById("modal-rechazo").classList.add("show");
+      setTimeout(function(){ document.getElementById("motivo-rechazo").focus(); }, 100);
+    }
+
+    function cerrarModalRechazo() {
+      document.getElementById("modal-rechazo").classList.remove("show");
+      evRechazoCodigo = null; evRechazoFilaLev = null;
+    }
+
+    function confirmarRechazo() {
+      var motivo = document.getElementById("motivo-rechazo").value.trim();
+      if (!motivo || motivo.length < 10) { showToast("Ingresa un motivo de al menos 10 caracteres", "error"); return; }
+      var codigo = evRechazoCodigo; var filaLev = evRechazoFilaLev;
+      var card = document.getElementById("ev-card-" + filaLev);
+      if (card) { card.style.opacity = "0.5"; card.style.pointerEvents = "none"; }
+      cerrarModalRechazo();
+      google.script.run
+        .withSuccessHandler(function(){
+          showToast("🚫 " + codigo + " rechazado · Correo enviado", "ok");
+          evidenciasCache = evidenciasCache.filter(function(ev){ return ev.filaLev !== filaLev; });
+          renderEvidencias(evidenciasCache); actualizarBadgeEvidencias(evidenciasCache.length);
+        })
+        .withFailureHandler(function(err){
+          showToast("Error al rechazar: " + err.message, "error");
+          if (card) { card.style.opacity = "1"; card.style.pointerEvents = "auto"; }
+        })
+        .rechazarLevantamiento(codigo, filaLev, "Inspector SMA", motivo);
+    }
+
+    document.getElementById("modal-rechazo").addEventListener("click", function(e){ if (e.target === this) cerrarModalRechazo(); });
+
+    function cargarKpi() {
+      document.getElementById("kpi-contenido").innerHTML = '<div class="kpi-empty">📊 Sección KPI en desarrollo</div>';
+    }
+
+    document.addEventListener("DOMContentLoaded", function(){
+      $(".select-buscable").select2({ width: "100%", placeholder: "— Escribe para buscar —", allowClear: true });
+      cargarBandeja();
+      setTimeout(function(){
+        google.script.run
+          .withSuccessHandler(function(lista){ actualizarBadgeEvidencias((lista || []).length); })
+          .withFailureHandler(function(){})
+          .obtenerLevantamientosPendientes();
+      }, 1500);
+    });
+  </script>
+</body>
+</html>
