@@ -1,0 +1,340 @@
+/**
+ * =====================================================================
+ * FUNCIONES DE LECTURA DE DATOS — NUEVA ESTRUCTURA
+ * =====================================================================
+ * Reemplaza TODAS las funciones de obtención de datos en tus scripts.
+ * Compatible con la nueva hoja "1.Tablas de Soporte" reorganizada:
+ *
+ *   A-B  → Empresas
+ *   D-H  → Responsables (Nombre, Área, Sub Área, Email, Correos Adicionales)
+ *   J-K  → Reportantes (Nombre, Programado)
+ *   M    → Quién Reporta
+ *   O-P  → Meses / Trimestres
+ *
+ * PRINCIPIO: todas leen dinámicamente hasta la última fila con datos,
+ * por lo que agregar filas en Sheets se refleja automáticamente.
+ * =====================================================================
+ */
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER: obtener hoja de soporte con validación
+// ─────────────────────────────────────────────────────────────────────
+function _getHojaSoporte() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName("1.Tablas de Soporte");
+  if (!hoja) throw new Error("No se encontró la hoja '1.Tablas de Soporte'");
+  return hoja;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// HELPER: leer una columna completa desde fila 2 hasta el último dato
+// ─────────────────────────────────────────────────────────────────────
+function _leerColumna(hoja, colIndex) {
+  const ultimaFila = hoja.getLastRow();
+  if (ultimaFila < 2) return [];
+  return hoja
+    .getRange(2, colIndex, ultimaFila - 1, 1)
+    .getValues()
+    .flat()
+    .map(v => String(v || "").trim())
+    .filter(v => v !== "" && v !== "undefined");
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 1. EMPRESAS — col B (índice 2)
+// ═════════════════════════════════════════════════════════════════════
+function obtenerEmpresas() {
+  try {
+    return _leerColumna(_getHojaSoporte(), 2);
+  } catch(e) {
+    Logger.log("Error obtenerEmpresas: " + e.message);
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 2. RESPONSABLES (lista simple) — col D (índice 4)
+// ═════════════════════════════════════════════════════════════════════
+function obtenerResponsables() {
+  try {
+    return _leerColumna(_getHojaSoporte(), 4);
+  } catch(e) {
+    Logger.log("Error obtenerResponsables: " + e.message);
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 3. MAPA DE RESPONSABLES — cols D-H
+//    Retorna objeto: { "Nombre": [emailPrincipal, subArea, area, correosCc] }
+//    Compatible con la función mapearResponsablesDesdeTabla3() existente
+// ═════════════════════════════════════════════════════════════════════
+function mapearResponsablesDesdeTabla3() {
+  try {
+    const hoja       = _getHojaSoporte();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila < 2) return {};
+
+    // D=col4, E=col5, F=col6, G=col7, H=col8
+    // D: Nombre, E: Área, F: Sub Área, G: Email Principal, H: Correos Adicionales
+    const datos = hoja.getRange(2, 4, ultimaFila - 1, 5).getValues();
+
+    const mapa = {};
+    datos.forEach(fila => {
+      const nombre = String(fila[0] || "").trim();
+      if (!nombre) return;
+      mapa[nombre] = [
+        String(fila[3] || "").trim(),  // [0] Email Principal   (col G)
+        String(fila[2] || "").trim(),  // [1] Sub Área          (col F)
+        String(fila[1] || "").trim(),  // [2] Área              (col E)
+        String(fila[4] || "").trim()   // [3] Correos Adicionales (col H) — NUEVO
+      ];
+    });
+
+    return mapa;
+  } catch(e) {
+    Logger.log("Error mapearResponsablesDesdeTabla3: " + e.message);
+    return {};
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 4. SUB ÁREAS — col E (índice 5) = ÁREA, sin duplicados
+// ═════════════════════════════════════════════════════════════════════
+function obtenerSubAreas() {
+  try {
+    const hoja = _getHojaSoporte();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila < 2) return [];
+    const todos = hoja
+      .getRange(2, 5, ultimaFila - 1, 1)
+      .getValues()
+      .flat()
+      .map(v => String(v || "").trim())
+      .filter(v => v !== "");
+    return [...new Set(todos)];
+  } catch(e) {
+    Logger.log("Error obtenerSubAreas: " + e.message);
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 5. REPORTANTES — col J (índice 10)
+//    Antes estaba en hoja "Nombre de personal" col E.
+//    Ahora también busca en la nueva hoja de soporte.
+//    Si necesitas mantener ambas fuentes, usa obtenerNombresPersonal().
+// ═════════════════════════════════════════════════════════════════════
+function obtenerNombresReportantes() {
+  try {
+    return _leerColumna(_getHojaSoporte(), 10); // col J
+  } catch(e) {
+    Logger.log("Error obtenerNombresReportantes: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * Mantiene compatibilidad con código existente que llama
+ * obtenerNombresCompletos() leyendo de "Nombre de personal".
+ * Fusiona ambas fuentes y elimina duplicados.
+ */
+function obtenerNombresCompletos() {
+  try {
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName("Nombre de personal");
+    let desdePersonal = [];
+    if (hoja) {
+      desdePersonal = hoja
+        .getRange(2, 5, Math.max(hoja.getLastRow() - 1, 1), 1)
+        .getValues()
+        .flat()
+        .map(v => String(v || "").trim())
+        .filter(v => v);
+    }
+    // También incluir los de la tabla de soporte
+    const desdeSoporte = obtenerNombresReportantes();
+    return [...new Set([...desdePersonal, ...desdeSoporte])];
+  } catch(e) {
+    Logger.log("Error obtenerNombresCompletos: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * Alias para compatibilidad con código que llama obtenerNombresPersonal()
+ */
+function obtenerNombresPersonal() {
+  return obtenerNombresCompletos();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 6. QUIÉN REPORTA — col T (índice 20) = Tabla_9, columna de textos
+//    Lee dinámicamente. Agregar filas en col T → aparece automáticamente.
+// ═════════════════════════════════════════════════════════════════════
+function obtenerQuienReporta() {
+  try {
+    const hoja = _getHojaSoporte();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila < 2) return [];
+    return hoja
+      .getRange(2, 20, ultimaFila - 1, 1)
+      .getValues()
+      .flat()
+      .map(v => String(v || "").trim())
+      .filter(v => v !== "" && v !== "undefined" && isNaN(Number(v)));
+  } catch(e) {
+    Logger.log("Error obtenerQuienReporta: " + e.message);
+    return [
+      "1.AUDITORÍA COMPORTAMENTAL",
+      "2.INSPECCIÓN SMA",
+      "3.INSPECCIÓN CSST",
+      "4.INSPECCIÓN SUPERVISOR SSO",
+      "5.INSPECCIÓN TRIMESTRAL GO",
+      "6.CONTRATISTA",
+      "7.INSPECCIÓN DE LAS ÁREAS",
+      "8.VÍA WHATSAPP",
+      "9. INSPECCIÓN SUPERINTENDENCIAS"
+    ];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 7. TIPIFICACIONES — hoja "2.TIPIFICACIÓN" col B
+//    Sin cambios, ya era dinámica
+// ═════════════════════════════════════════════════════════════════════
+function obtenerTipificaciones() {
+  try {
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName("2.TIPIFICACIÓN");
+    if (!hoja) return [];
+    return hoja
+      .getRange(2, 2, Math.max(hoja.getLastRow() - 1, 1), 1)
+      .getValues()
+      .flat()
+      .map(v => String(v || "").trim())
+      .filter(v => v);
+  } catch(e) {
+    Logger.log("Error obtenerTipificaciones: " + e.message);
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 8. MESES Y TRIMESTRES — cols O-P (índices 15-16)
+// ═════════════════════════════════════════════════════════════════════
+function obtenerMesesTrimestres() {
+  try {
+    const hoja       = _getHojaSoporte();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila < 2) return [];
+    return hoja
+      .getRange(2, 15, ultimaFila - 1, 2)
+      .getValues()
+      .filter(fila => String(fila[0] || "").trim() !== "")
+      .map(fila => ({
+        mes:       String(fila[0] || "").trim(),
+        trimestre: String(fila[1] || "").trim()
+      }));
+  } catch(e) {
+    Logger.log("Error obtenerMesesTrimestres: " + e.message);
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 9. CORREOS ADICIONALES POR RESPONSABLE
+//    Nueva función que devuelve los correos en CC de la col H
+// ═════════════════════════════════════════════════════════════════════
+function obtenerCorreosAdicionalesPorResponsable(nombreResponsable) {
+  try {
+    const mapa = mapearResponsablesDesdeTabla3();
+    const datos = mapa[nombreResponsable.trim()];
+    if (!datos || !datos[3]) return [];
+    return datos[3]
+      .split(/[,;|]/)
+      .map(e => e.trim())
+      .filter(e => e.includes("@"));
+  } catch(e) {
+    Logger.log("Error obtenerCorreosAdicionalesPorResponsable: " + e.message);
+    return [];
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 10. VERIFICAR PROGRAMADO — ahora usa col K de la nueva estructura
+//     Reemplaza a la función que leía de "REPORTES PROGRAMADOS"
+// ═════════════════════════════════════════════════════════════════════
+function verificarProgramado(quienReporta) {
+  try {
+    const hoja       = _getHojaSoporte();
+    const ultimaFila = hoja.getLastRow();
+    if (ultimaFila < 2) return "NO PROGRAMADO";
+
+    // cols J-K (índices 10-11)
+    const datos = hoja.getRange(2, 10, ultimaFila - 1, 2).getValues();
+    const nombre = String(quienReporta || "").trim().toLowerCase();
+
+    for (let i = 0; i < datos.length; i++) {
+      const nombreFila = String(datos[i][0] || "").trim().toLowerCase();
+      if (nombreFila === nombre) {
+        return String(datos[i][1] || "NO PROGRAMADO").trim() || "NO PROGRAMADO";
+      }
+    }
+
+    // Si no encontró en la nueva hoja, buscar en hoja legacy
+    const hojaLegacy = SpreadsheetApp.getActiveSpreadsheet()
+                         .getSheetByName("REPORTES PROGRAMADOS");
+    if (hojaLegacy) {
+      const datosL = hojaLegacy.getDataRange().getValues();
+      for (let i = 1; i < datosL.length; i++) {
+        if (String(datosL[i][1] || "").trim().toLowerCase() === nombre) {
+          return datosL[i][7] || "NO PROGRAMADO";
+        }
+      }
+    }
+
+    return "NO PROGRAMADO";
+  } catch(e) {
+    Logger.log("Error verificarProgramado: " + e.message);
+    return "NO PROGRAMADO";
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// 11. FUNCIÓN DE DIAGNÓSTICO — ejecutar para verificar la estructura
+// ═════════════════════════════════════════════════════════════════════
+function diagnosticarEstructura() {
+  Logger.log("═══ DIAGNÓSTICO DE ESTRUCTURA ═══");
+
+  const empresas  = obtenerEmpresas();
+  Logger.log("✅ Empresas (" + empresas.length + "): " + empresas.slice(0, 3).join(", ") + "...");
+
+  const resps = obtenerResponsables();
+  Logger.log("✅ Responsables (" + resps.length + "): " + resps.slice(0, 3).join(", ") + "...");
+
+  const mapa = mapearResponsablesDesdeTabla3();
+  const claves = Object.keys(mapa);
+  Logger.log("✅ Mapa responsables (" + claves.length + " entradas)");
+  if (claves.length > 0) {
+    const ej = claves[0];
+    Logger.log("   Ejemplo '" + ej + "': email=" + mapa[ej][0] + " | subArea=" + mapa[ej][1] + " | area=" + mapa[ej][2] + " | cc=" + mapa[ej][3]);
+  }
+
+  const subAreas = obtenerSubAreas();
+  Logger.log("✅ Sub Áreas (" + subAreas.length + "): " + subAreas.join(", "));
+
+  const reportantes = obtenerNombresReportantes();
+  Logger.log("✅ Reportantes (" + reportantes.length + "): " + reportantes.slice(0, 3).join(", ") + "...");
+
+  const qr = obtenerQuienReporta();
+  Logger.log("✅ Quién Reporta (" + qr.length + "): " + qr.join(" | "));
+
+  const tip = obtenerTipificaciones();
+  Logger.log("✅ Tipificaciones (" + tip.length + ")");
+
+  const meses = obtenerMesesTrimestres();
+  Logger.log("✅ Meses (" + meses.length + ")");
+
+  Logger.log("═══ FIN DIAGNÓSTICO ═══");
+}
