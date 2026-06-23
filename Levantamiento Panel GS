@@ -1,0 +1,489 @@
+/**
+ * ============================================================
+ * MÓDULO: LEVANTAMIENTO DE DESVIACIONES
+ * ============================================================
+ */
+
+// ── CONSTANTES ────────────────────────────────────────────────
+const CARPETA_LEV_ID    = "1AJmqW5a7tf-4NBpZPPqhJH_krcRqKIif";
+const HOJA_LEV          = "Levantamientos";
+const HOJA_ACUM         = "Acumulado";
+const COL_ESTATUS_ACUM  = 39;   // columna AM (1-indexed)
+const COL_CODIGO_ACUM   = 3;    // columna C  (1-indexed)
+const COL_DETALLE_ACUM  = 23;   // columna W  (1-indexed)
+const COL_RESP_ACUM     = 35;   // columna AI (1-indexed)
+const COL_AREA_ACUM     = 37;   // columna AK (1-indexed)
+const COL_FECHA_LIM     = 38;   // columna AL (1-indexed)
+const EMAIL_INSPECTOR   = "mvillagarcia@cssa.com.pe,evasquezp@cssa.com.pe,esuxe@cssa.com.pe";
+
+// ============================================================
+// 1. OBTENER DESVIACIONES PENDIENTES PARA EL SELECTOR HTML
+// ============================================================
+function obtenerDesviacionesPendientesLev() {
+  try {
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const hAcum = ss.getSheetByName(HOJA_ACUM);
+    if (!hAcum || hAcum.getLastRow() < 2) return [];
+
+    const tz         = Session.getScriptTimeZone();
+    const ultimaFila = hAcum.getLastRow();
+    const datos      = hAcum.getRange(2, 1, ultimaFila - 1, COL_ESTATUS_ACUM).getValues();
+
+    const resultado = [];
+    datos.forEach(fila => {
+      const codigo  = String(fila[COL_CODIGO_ACUM - 1]  || "").trim();
+      const estatus = String(fila[COL_ESTATUS_ACUM - 1] || "").trim();
+      const detalle = String(fila[COL_DETALLE_ACUM - 1] || "").trim();
+      const resp    = String(fila[COL_RESP_ACUM - 1]    || "").trim();
+      const area    = String(fila[COL_AREA_ACUM - 1]    || "").trim();
+
+      if (!codigo) return;
+
+      const estatusNorm = estatus.toLowerCase();
+      if (estatusNorm !== "en plazo" && estatusNorm !== "pendiente") return;
+
+      let fechaLimStr = "";
+      const rawFechaLim = fila[COL_FECHA_LIM - 1];
+      if (rawFechaLim instanceof Date && !isNaN(rawFechaLim)) {
+        fechaLimStr = Utilities.formatDate(rawFechaLim, tz, "dd/MM/yyyy");
+      } else if (rawFechaLim) {
+        fechaLimStr = String(rawFechaLim).trim();
+      }
+
+      resultado.push({
+        codigo:      codigo,
+        detalle:     detalle.substring(0, 120) || "Sin descripción",
+        responsable: resp  || "—",
+        area:        area  || "—",
+        estatus:     estatus,
+        fechaLimite: fechaLimStr,
+      });
+    });
+
+    resultado.sort((a, b) => b.codigo.localeCompare(a.codigo));
+    Logger.log("obtenerDesviacionesPendientesLev → " + resultado.length + " desviaciones encontradas");
+    return resultado;
+
+  } catch(e) {
+    Logger.log("Error obtenerDesviacionesPendientesLev: " + e.message);
+    return [];
+  }
+}
+
+// ============================================================
+// 2. REGISTRAR LEVANTAMIENTO
+// ============================================================
+function registrarLevantamiento(datos) {
+
+  if (!datos.codigo)                              throw new Error("Código de desviación requerido.");
+  if (!datos.nombre)                              throw new Error("Nombre del responsable requerido.");
+  if (!datos.archivos || datos.archivos.length === 0) throw new Error("No se recibieron archivos de evidencia.");
+
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const tz  = Session.getScriptTimeZone();
+
+  // ── A. Garantizar hoja "Levantamientos" ──
+  let hLev = ss.getSheetByName(HOJA_LEV);
+  if (!hLev) {
+    hLev = ss.insertSheet(HOJA_LEV);
+    hLev.appendRow([
+      "ID", "CÓDIGO DESVIACIÓN", "NOMBRE RESPONSABLE",
+      "DESCRIPCIÓN LEVANTAMIENTO", "FECHA Y HORA ENVÍO",
+      "N° ARCHIVOS", "URLs ARCHIVOS", "ESTADO VALIDACIÓN",
+      "FECHA VALIDACIÓN", "INSPECTOR QUE VALIDÓ", "OBSERVACIÓN INSPECTOR"
+    ]);
+    hLev.getRange(1, 1, 1, 11)
+      .setBackground("#111111").setFontColor("#CE000C")
+      .setFontWeight("bold").setFontSize(11);
+    hLev.setFrozenRows(1);
+    hLev.setColumnWidths(1, 11, 160);
+    Logger.log("✅ Hoja 'Levantamientos' creada.");
+  }
+
+  const idLev = hLev.getLastRow();
+
+  // ── B. Parsear fecha ──
+  let fechaEnvio;
+  try {
+    fechaEnvio = new Date(datos.fechaHora);
+    if (isNaN(fechaEnvio)) fechaEnvio = new Date();
+  } catch(e) { fechaEnvio = new Date(); }
+  const fechaEnvioStr = Utilities.formatDate(fechaEnvio, tz, "dd/MM/yyyy HH:mm:ss");
+
+  // ── C. Crear subcarpeta en Drive ──
+  let subcarpeta;
+  try {
+    const carpetaRaiz  = DriveApp.getFolderById(CARPETA_LEV_ID);
+    const iterCarpetas = carpetaRaiz.getFoldersByName(datos.codigo);
+    subcarpeta = iterCarpetas.hasNext() ? iterCarpetas.next() : carpetaRaiz.createFolder(datos.codigo);
+  } catch(e) {
+    Logger.log("⚠️ Error accediendo a carpeta Drive: " + e.message);
+    throw new Error("No se pudo acceder a la carpeta de Drive. ID: " + CARPETA_LEV_ID);
+  }
+
+  // ── D. Subir archivos ──
+  const archivosSubidos = [];
+  datos.archivos.forEach((arch, idx) => {
+    try {
+      const b64Limpio = arch.base64.includes(",") ? arch.base64.split(",")[1] : arch.base64;
+      if (!b64Limpio) { Logger.log("⚠️ Archivo vacío: " + arch.nombre); return; }
+
+      let mimeType = "image/jpeg";
+      if (arch.tipo === "video")                             mimeType = "video/mp4";
+      else if (arch.tipo === "pdf")                          mimeType = "application/pdf";
+      else if (arch.base64.includes("data:image/png"))       mimeType = "image/png";
+      else if (arch.base64.includes("data:video/"))          mimeType = "video/mp4";
+      else if (arch.base64.includes("data:application/pdf")) mimeType = "application/pdf";
+
+      const ext          = arch.tipo === "video" ? ".mp4" : arch.tipo === "pdf" ? ".pdf" : ".jpg";
+      const nombreDrive  = datos.codigo + "_" + (idx + 1) + "_" + arch.nombre.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const blob         = Utilities.newBlob(Utilities.base64Decode(b64Limpio), mimeType, nombreDrive);
+      const archivo      = subcarpeta.createFile(blob);
+      archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+      archivosSubidos.push({ nombre: arch.nombre, url: archivo.getUrl(), tipo: arch.tipo });
+      Logger.log("📁 Archivo subido: " + nombreDrive);
+    } catch(e) {
+      Logger.log("⚠️ Error subiendo " + arch.nombre + ": " + e.message);
+    }
+  });
+
+  if (archivosSubidos.length === 0) {
+    throw new Error("No se pudo subir ningún archivo a Drive. Verifica los permisos de la carpeta.");
+  }
+
+  const urlsStr = archivosSubidos.map(a => a.url).join(" | ");
+
+  // ── E. Escribir fila en "Levantamientos" ──
+  hLev.appendRow([
+    idLev,
+    datos.codigo,
+    datos.nombre,
+    datos.descripcion,
+    fechaEnvio,
+    archivosSubidos.length,
+    urlsStr,
+    "PENDIENTE",
+    "", "", ""
+  ]);
+
+  const uF = hLev.getLastRow();
+  hLev.getRange(uF, 5).setNumberFormat("dd/MM/yyyy HH:mm:ss");
+  hLev.getRange(uF, 1, 1, 11).setBackground("#fff9e6");
+
+  // ── F. Alertar al inspector ──
+  _enviarAlertaLevantamiento(datos, archivosSubidos, fechaEnvioStr, idLev);
+
+  Logger.log("✅ Levantamiento registrado: ID=" + idLev + " | Código=" + datos.codigo + " | " + archivosSubidos.length + " archivos");
+  return { codigo: datos.codigo, archivos: archivosSubidos.length };
+}
+
+// ============================================================
+// 3. ALERTA AL INSPECTOR POR EMAIL
+// ============================================================
+function _enviarAlertaLevantamiento(datos, archivosSubidos, fechaEnvioStr, idLev) {
+  try {
+    const urlPanel = ScriptApp.getService().getUrl() + "?form=inspector";
+
+    const filasArchivos = archivosSubidos.map(a =>
+      '<tr><td style="padding:8px 10px;font-size:12px;border-bottom:1px solid #E5E7EB;">'
+      + (a.tipo === "foto" ? "🖼️" : a.tipo === "pdf" ? "📄" : "🎬") + " " + a.nombre
+      + '</td><td style="padding:8px 10px;font-size:12px;border-bottom:1px solid #E5E7EB;">'
+      + '<a href="' + a.url + '" style="color:#CE000C;font-weight:600;text-decoration:none;">Ver archivo →</a>'
+      + '</td></tr>'
+    ).join("");
+
+    const htmlBody =
+      '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#f0f2f4;padding:20px;">'
+      + '<div style="background:white;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">'
+      + '<div style="background:#111111;padding:16px 24px;">'
+      + '<span style="color:white;font-weight:700;font-size:16px;">Pacasmayo</span>'
+      + '<div style="width:11px;height:11px;background:#CE000C;display:inline-block;margin-left:10px;"></div>'
+      + '<span style="color:rgba(255,255,255,0.45);font-size:11px;margin-left:6px;">Seguridad y Medio Ambiente</span>'
+      + '</div>'
+      + '<div style="background:#16A34A;padding:14px 24px;">'
+      + '<div style="color:white;font-size:16px;font-weight:700;">📎 Nueva Evidencia de Levantamiento</div>'
+      + '<div style="color:rgba(255,255,255,0.85);font-size:12px;margin-top:2px;">Desviación <strong>' + datos.codigo + '</strong> — enviada el ' + fechaEnvioStr + '</div>'
+      + '</div>'
+      + '<div style="padding:24px;">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px;">'
+      + '<tr style="background:#F9FAFB;"><td style="padding:9px 12px;color:#6B7280;font-weight:600;width:36%;border-bottom:1px solid #E5E7EB;">Desviación</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;font-weight:700;">' + datos.codigo + '</td></tr>'
+      + '<tr><td style="padding:9px 12px;color:#6B7280;font-weight:600;border-bottom:1px solid #E5E7EB;">Responsable</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;">' + datos.nombre + '</td></tr>'
+      + '<tr style="background:#F9FAFB;"><td style="padding:9px 12px;color:#6B7280;font-weight:600;border-bottom:1px solid #E5E7EB;vertical-align:top;">Acciones tomadas</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;line-height:1.5;">' + datos.descripcion + '</td></tr>'
+      + '<tr><td style="padding:9px 12px;color:#6B7280;font-weight:600;border-bottom:1px solid #E5E7EB;">Archivos</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;">' + archivosSubidos.length + ' archivo(s)</td></tr>'
+      + '</table>'
+      + '<div style="font-size:12px;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Evidencias subidas (' + archivosSubidos.length + ')</div>'
+      + '<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">' + filasArchivos + '</table>'
+      + '<div style="background:#FEF3C7;border-left:4px solid #F59E0B;padding:12px 16px;border-radius:0 4px 4px 0;margin-bottom:20px;">'
+      + '<strong style="font-size:13px;color:#92400E;">⚠️ Acción requerida</strong>'
+      + '<p style="font-size:13px;color:#78350F;margin:4px 0 0;line-height:1.5;">Para que el estatus cambie a <strong>Ejecutado</strong>, debes revisar la evidencia en el Panel Inspector y aceptarla.</p>'
+      + '</div>'
+      + '<div style="text-align:center;">'
+      + '<a href="' + urlPanel + '" style="background:#CE000C;color:white;text-decoration:none;padding:12px 28px;border-radius:3px;font-weight:700;font-size:13px;display:inline-block;">→ Validar en Panel Inspector</a>'
+      + '</div></div>'
+      + '<div style="padding:12px 24px;border-top:1px solid #E5E7EB;font-size:11px;color:#9CA3AF;">ID Levantamiento: ' + idLev + ' · Sistema SMA · Cementos Pacasmayo</div>'
+      + '</div></div>';
+
+    MailApp.sendEmail({
+      to:       EMAIL_INSPECTOR,
+      subject:  "📎 Levantamiento enviado · " + datos.codigo + " · " + datos.nombre,
+      htmlBody: htmlBody
+    });
+    Logger.log("📧 Alerta inspector enviada para levantamiento " + datos.codigo);
+
+  } catch(e) {
+    Logger.log("⚠️ Error enviando alerta inspector: " + e.message);
+  }
+}
+
+// ============================================================
+// 4. ACEPTAR LEVANTAMIENTO
+// ============================================================
+function aceptarLevantamiento(codigo, filaLev, inspector) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const tz    = Session.getScriptTimeZone();
+  const ahora = new Date();
+  const fechaStr = Utilities.formatDate(ahora, tz, "dd/MM/yyyy HH:mm");
+
+  const hLev = ss.getSheetByName(HOJA_LEV);
+  if (hLev && filaLev >= 2) {
+    hLev.getRange(filaLev, 8).setValue("ACEPTADO");
+    hLev.getRange(filaLev, 9).setValue(fechaStr);
+    hLev.getRange(filaLev, 10).setValue(inspector || "Inspector SMA");
+    hLev.getRange(filaLev, 1, 1, 11).setBackground("#dcfce7");
+    Logger.log("✅ Levantamiento fila " + filaLev + " marcado como ACEPTADO");
+  }
+
+  let codigoActualizado = false;
+  const hAcum = ss.getSheetByName(HOJA_ACUM);
+  if (hAcum && hAcum.getLastRow() > 1) {
+    const codigos = hAcum.getRange(2, COL_CODIGO_ACUM, hAcum.getLastRow() - 1, 1).getValues();
+    codigos.forEach((fila, i) => {
+      if (String(fila[0]).trim() === String(codigo).trim()) {
+        hAcum.getRange(i + 2, COL_ESTATUS_ACUM).setValue("Ejecutado");
+        Logger.log("✅ Acumulado fila " + (i + 2) + " → Ejecutado");
+        codigoActualizado = true;
+      }
+    });
+  }
+
+  return { ok: true, codigoActualizado };
+}
+
+// ============================================================
+// 5. RECHAZAR LEVANTAMIENTO
+// ============================================================
+function rechazarLevantamiento(codigo, filaLev, inspector, motivo) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const tz    = Session.getScriptTimeZone();
+  const ahora = new Date();
+  const fechaStr = Utilities.formatDate(ahora, tz, "dd/MM/yyyy HH:mm");
+
+  const hLev = ss.getSheetByName(HOJA_LEV);
+  let nombreResponsable = "";
+  let descripcionLev    = "";
+  if (hLev && filaLev >= 2) {
+    nombreResponsable = String(hLev.getRange(filaLev, 3).getValue() || "").trim();
+    descripcionLev    = String(hLev.getRange(filaLev, 4).getValue() || "").trim();
+    hLev.getRange(filaLev, 8).setValue("RECHAZADO");
+    hLev.getRange(filaLev, 9).setValue(fechaStr);
+    hLev.getRange(filaLev, 10).setValue(inspector || "Inspector SMA");
+    hLev.getRange(filaLev, 11).setValue(motivo || "");
+    hLev.getRange(filaLev, 1, 1, 11).setBackground("#fee2e2");
+    Logger.log("🚫 Levantamiento fila " + filaLev + " RECHAZADO. Motivo: " + motivo);
+  }
+
+  let emailResponsable  = "";
+  let detalleDesviacion = "";
+  let areaDesviacion    = "";
+  let fechaLimiteStr    = "";
+
+  const hAcum = ss.getSheetByName(HOJA_ACUM);
+  if (hAcum && hAcum.getLastRow() > 1) {
+    const datosAcum = hAcum.getRange(2, 1, hAcum.getLastRow() - 1, COL_ESTATUS_ACUM).getValues();
+    for (let i = 0; i < datosAcum.length; i++) {
+      if (String(datosAcum[i][COL_CODIGO_ACUM - 1]).trim() === String(codigo).trim()) {
+        emailResponsable  = String(datosAcum[i][35] || "").trim();
+        detalleDesviacion = String(datosAcum[i][COL_DETALLE_ACUM - 1] || "").trim();
+        areaDesviacion    = String(datosAcum[i][COL_AREA_ACUM - 1]    || "").trim();
+        const rawFLim     = datosAcum[i][COL_FECHA_LIM - 1];
+        if (rawFLim instanceof Date && !isNaN(rawFLim)) {
+          fechaLimiteStr = Utilities.formatDate(rawFLim, tz, "dd/MM/yyyy");
+        }
+        break;
+      }
+    }
+  }
+
+  if (emailResponsable && emailResponsable.includes("@")) {
+    try {
+      _enviarCorreoRechazo({
+        emailResponsable, nombreResponsable, codigo,
+        detalleDesviacion, areaDesviacion, fechaLimiteStr,
+        descripcionLev, motivo, inspector, fechaRechazo: fechaStr
+      });
+      Logger.log("📧 Correo de rechazo enviado a: " + emailResponsable);
+    } catch(e) {
+      Logger.log("⚠️ Error enviando correo de rechazo: " + e.message);
+    }
+  }
+
+  return { ok: true };
+}
+
+function _enviarCorreoRechazo(d) {
+  const urlPortal = ScriptApp.getService().getUrl() + "?form=trabajador";
+
+  const htmlBody =
+    '<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#f0f2f4;padding:20px;">'
+    + '<div style="background:white;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">'
+    + '<div style="background:#111111;padding:16px 24px;">'
+    + '<span style="color:white;font-weight:700;font-size:16px;">Pacasmayo</span>'
+    + '<div style="width:11px;height:11px;background:#CE000C;display:inline-block;margin-left:10px;"></div>'
+    + '<span style="color:rgba(255,255,255,0.45);font-size:11px;margin-left:6px;">Seguridad y Medio Ambiente</span>'
+    + '</div>'
+    + '<div style="background:#CE000C;padding:14px 24px;">'
+    + '<div style="color:white;font-size:16px;font-weight:700;">🚫 Evidencia Rechazada</div>'
+    + '<div style="color:rgba(255,255,255,0.85);font-size:12px;margin-top:2px;">Desviación <strong>' + d.codigo + '</strong> — requiere nueva evidencia</div>'
+    + '</div>'
+    + '<div style="padding:24px;">'
+    + '<p style="color:#1c2b3a;font-size:14px;margin:0 0 16px;">Estimado/a <strong>' + (d.nombreResponsable || "responsable") + '</strong>,</p>'
+    + '<p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 18px;">La evidencia de levantamiento que enviaste para la desviación <strong>' + d.codigo + '</strong> fue revisada por el inspector SMA y <strong style="color:#CE000C;">no fue aceptada</strong>.</p>'
+    + '<div style="background:#fff5f5;border-left:4px solid #CE000C;border-radius:0 4px 4px 0;padding:14px 16px;margin:0 0 22px;">'
+    + '<div style="font-size:11px;color:#CE000C;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Motivo del rechazo</div>'
+    + '<div style="font-size:14px;color:#1c2b3a;line-height:1.5;">' + d.motivo + '</div>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:22px;">'
+    + '<tr style="background:#F9FAFB;"><td style="padding:9px 12px;color:#6B7280;font-weight:600;width:38%;border-bottom:1px solid #E5E7EB;">Código</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;font-weight:700;">' + d.codigo + '</td></tr>'
+    + '<tr><td style="padding:9px 12px;color:#6B7280;font-weight:600;border-bottom:1px solid #E5E7EB;">Área</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;">' + (d.areaDesviacion || "—") + '</td></tr>'
+    + '<tr style="background:#F9FAFB;"><td style="padding:9px 12px;color:#6B7280;font-weight:600;border-bottom:1px solid #E5E7EB;vertical-align:top;">Detalle de la desviación</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;line-height:1.5;">' + (d.detalleDesviacion || "—") + '</td></tr>'
+    + '<tr><td style="padding:9px 12px;color:#6B7280;font-weight:600;border-bottom:1px solid #E5E7EB;">Fecha límite</td><td style="padding:9px 12px;color:#111;border-bottom:1px solid #E5E7EB;">' + (d.fechaLimiteStr || "—") + '</td></tr>'
+    + '</table>'
+    + '<div style="text-align:center;margin-bottom:8px;">'
+    + '<a href="' + urlPortal + '" style="background:#CE000C;color:white;text-decoration:none;padding:12px 28px;border-radius:3px;font-weight:700;font-size:13px;display:inline-block;">→ Subir Nueva Evidencia</a>'
+    + '</div>'
+    + '<p style="color:#6B7280;font-size:12px;line-height:1.5;margin:18px 0 0;text-align:center;">Ingresa al Portal SMA → pestaña <strong>"Levantar Desviación"</strong> y vuelve a subir la evidencia.</p>'
+    + '</div>'
+    + '<div style="padding:12px 24px;border-top:1px solid #E5E7EB;font-size:11px;color:#9CA3AF;">Rechazado por ' + (d.inspector || "Inspector SMA") + ' · ' + d.fechaRechazo + ' · Sistema SMA · Cementos Pacasmayo</div>'
+    + '</div></div>';
+
+  MailApp.sendEmail({
+    to:       d.emailResponsable,
+    cc:       EMAIL_INSPECTOR,
+    subject:  "🚫 Evidencia rechazada · " + d.codigo + " · Subir nueva evidencia",
+    htmlBody: htmlBody
+  });
+}
+
+// ============================================================
+// 6. OBTENER LEVANTAMIENTOS PENDIENTES — CORREGIDO
+//    Muestra código correcto + detalle completo de la desviación
+// ============================================================
+function obtenerLevantamientosPendientes() {
+  try {
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const hLev  = ss.getSheetByName(HOJA_LEV);
+    const hAcum = ss.getSheetByName(HOJA_ACUM);
+    if (!hLev || hLev.getLastRow() < 2) return [];
+
+    const tz = Session.getScriptTimeZone();
+
+    // ── Construir mapa código → datos completos de Acumulado ──
+    // Leemos todas las columnas relevantes de Acumulado de una vez
+    const mapaAcum = {};
+    if (hAcum && hAcum.getLastRow() > 1) {
+      const totalCols = COL_ESTATUS_ACUM; // hasta col AM
+      const filas = hAcum.getRange(2, 1, hAcum.getLastRow() - 1, totalCols).getValues();
+      filas.forEach(fila => {
+        // col C = índice 2 (0-based)
+        const cod = String(fila[COL_CODIGO_ACUM - 1] || "").trim();
+        if (!cod) return;
+
+        // Fecha límite formateada
+        let fechaLimStr = "";
+        const rawFL = fila[COL_FECHA_LIM - 1];
+        if (rawFL instanceof Date && !isNaN(rawFL)) {
+          fechaLimStr = Utilities.formatDate(rawFL, tz, "dd/MM/yyyy");
+        } else if (rawFL) {
+          fechaLimStr = String(rawFL).trim();
+        }
+
+        mapaAcum[cod] = {
+          detalle:     String(fila[COL_DETALLE_ACUM - 1] || "").trim(),   // col W
+          responsable: String(fila[COL_RESP_ACUM - 1]    || "").trim(),   // col AI
+          area:        String(fila[COL_AREA_ACUM - 1]    || "").trim(),   // col AK
+          estatus:     String(fila[COL_ESTATUS_ACUM - 1] || "").trim(),   // col AM
+          fechaLimite: fechaLimStr,
+          // Columnas adicionales para mostrar en panel
+          aspecto:     String(fila[11] || "").trim(),  // col L
+          clase:       String(fila[12] || "").trim(),  // col M
+          criticidad:  String(fila[27] || "").trim(),  // col AB
+          accionCorrectiva: String(fila[32] || "").trim(), // col AG
+        };
+      });
+    }
+
+    // ── Leer hoja Levantamientos ──
+    const datos  = hLev.getRange(2, 1, hLev.getLastRow() - 1, 11).getValues();
+    const result = [];
+
+    datos.forEach((fila, i) => {
+      const estado = String(fila[7] || "").trim().toUpperCase();
+      if (estado !== "PENDIENTE") return;
+
+      // Col B (índice 1) = CÓDIGO DESVIACIÓN — debe ser string limpio como "2026-001"
+      const codigoLev = String(fila[1] || "").trim();
+
+      // Validar que el código tenga formato esperado (no sea una fecha ni vacío)
+      if (!codigoLev || codigoLev === "") {
+        Logger.log("⚠️ Fila " + (i + 2) + " sin código válido, se omite.");
+        return;
+      }
+
+      // Fecha envío
+      const fechaRaw = fila[4];
+      let fechaStr   = "";
+      if (fechaRaw instanceof Date && !isNaN(fechaRaw)) {
+        fechaStr = Utilities.formatDate(fechaRaw, tz, "dd/MM/yyyy HH:mm");
+      } else {
+        fechaStr = String(fechaRaw || "").trim();
+      }
+
+      const urls = String(fila[6] || "").split(" | ").filter(Boolean);
+
+      // Datos de Acumulado para esta desviación
+      const datosDes = mapaAcum[codigoLev] || {};
+
+      result.push({
+        filaLev:     i + 2,
+        id:          fila[0],
+        codigo:      codigoLev,                                    // ← código correcto siempre
+        nombre:      String(fila[2] || "").trim(),
+        descripcion: String(fila[3] || "").trim(),
+        fechaEnvio:  fechaStr,
+        numArchivos: Number(fila[5] || 0),
+        urls:        urls,
+        estado:      estado,
+
+        // ── Datos de la desviación original (desde Acumulado) ──
+        detalleObservacion: datosDes.detalle     || "",
+        responsable:        datosDes.responsable || "",
+        area:               datosDes.area        || "",
+        estatusDesviacion:  datosDes.estatus     || "",
+        fechaLimite:        datosDes.fechaLimite || "",
+        aspecto:            datosDes.aspecto     || "",
+        clase:              datosDes.clase       || "",
+        criticidad:         datosDes.criticidad  || "",
+        accionCorrectiva:   datosDes.accionCorrectiva || "",
+      });
+    });
+
+    result.sort((a, b) => b.filaLev - a.filaLev);
+    Logger.log("obtenerLevantamientosPendientes → " + result.length + " pendientes");
+    return result;
+
+  } catch(e) {
+    Logger.log("Error obtenerLevantamientosPendientes: " + e.message);
+    return [];
+  }
+}
